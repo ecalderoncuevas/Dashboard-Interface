@@ -31,7 +31,7 @@ export function InspeccionDatos({
     <section
       id="inspeccion"
       aria-labelledby="titulo-inspeccion"
-      className="flex scroll-mt-4 flex-col gap-3"
+      className="flex scroll-mt-28 flex-col gap-3 lg:scroll-mt-6"
     >
       <h2 id="titulo-inspeccion" className="text-base font-medium">
         3. Inspección de datos

@@ -1,8 +1,19 @@
 const enteros = new Intl.NumberFormat("es-ES")
 const decimales = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 })
 
+const unDecimal = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 })
+
 export function formatoEntero(n: number) {
   return enteros.format(n)
+}
+
+/** "18,4 °C", "72 %", "3,5 mm". */
+export function formatoMedida(n: number, unidad: string) {
+  return `${unDecimal.format(n)} ${unidad}`
+}
+
+export function formatoPorcentaje(parte: number, total: number) {
+  return total > 0 ? `${unDecimal.format((parte / total) * 100)} %` : "—"
 }
 
 export function formatoNumero(n: number | null | undefined) {

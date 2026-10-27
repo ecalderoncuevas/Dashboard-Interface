@@ -11,7 +11,7 @@ import { EstadoBadge } from "./estado-badge"
 import { formatoDuracion, formatoEntero } from "./formato"
 import type { Pestana } from "./inspeccion-datos"
 
-interface Fase {
+export interface Fase {
   id: string
   titulo: string
   explicacion: string
@@ -24,7 +24,7 @@ interface Fase {
   pestana: Pestana
 }
 
-function calcularFases(etl: PipelineEtl): Fase[] {
+export function calcularFases(etl: PipelineEtl): Fase[] {
   const { extraccion, procesado, carga, conjuntoCarga, filtradosOrdenados } =
     etl
 
@@ -258,64 +258,6 @@ export function PipelineVisual({
           </li>
         ))}
       </ol>
-    </section>
-  )
-}
-
-export function Contadores({ etl }: { etl: PipelineEtl }) {
-  const { procesado, filtradosOrdenados, conjuntoCarga } = etl
-  const items: [string, number | null, string][] = [
-    [
-      "Total extraído",
-      procesado ? procesado.transformacion.registros.length : null,
-      "Registros generados a partir de las respuestas",
-    ],
-    [
-      "Válidos",
-      procesado ? procesado.limpieza.validos.length : null,
-      "Superan las reglas de calidad",
-    ],
-    [
-      "Rechazados",
-      procesado ? procesado.limpieza.rechazados.length : null,
-      "Descartes por calidad o duplicado",
-    ],
-    [
-      "Coinciden con los filtros",
-      procesado ? filtradosOrdenados.length : null,
-      "Válidos que cumplen los filtros actuales",
-    ],
-    [
-      "Seleccionados para cargar",
-      procesado ? conjuntoCarga.registros.length : null,
-      "Seleccionados y dentro de los filtros",
-    ],
-  ]
-  return (
-    <section aria-label="Contadores del pipeline">
-      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {items.map(([titulo, valor, ayuda]) => (
-          <div
-            key={titulo}
-            className="flex flex-col gap-0.5 rounded-xl bg-card p-3 ring-1 ring-foreground/10"
-          >
-            <dt className="text-xs text-muted-foreground">{titulo}</dt>
-            <dd className="text-2xl font-semibold tabular-nums">
-              {valor === null ? "—" : formatoEntero(valor)}
-            </dd>
-            <dd className="text-xs text-muted-foreground">{ayuda}</dd>
-          </div>
-        ))}
-      </dl>
-      {conjuntoCarga.seleccionadosFueraDeFiltro > 0 && (
-        <p
-          className="mt-2 text-sm text-amber-800 dark:text-amber-300"
-          role="status"
-        >
-          ⚠ {formatoEntero(conjuntoCarga.seleccionadosFueraDeFiltro)} fila(s)
-          seleccionada(s) quedan fuera de los filtros actuales y no se subirán.
-        </p>
-      )}
     </section>
   )
 }
