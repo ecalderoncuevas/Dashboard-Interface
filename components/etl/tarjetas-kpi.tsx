@@ -64,17 +64,17 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
       aria-label="Indicadores principales"
       className="flex flex-col gap-2"
     >
-      <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-4 xl:grid-cols-4 xl:gap-6">
         {kpis.map(({ titulo, valor, ayuda, icono: Icono, porcentaje }) => (
           <div
             key={titulo}
-            className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10"
+            className="flex flex-col gap-3 rounded-3xl neu p-4 sm:p-5"
           >
             <span
               aria-hidden
-              className="flex size-10 items-center justify-center rounded-xl ring-1 ring-foreground/10"
+              className="flex size-11 items-center justify-center rounded-2xl neu-hundido"
             >
-              <Icono className="size-5" />
+              <Icono className="size-5 text-marca" />
             </span>
             <div className="flex flex-col gap-1">
               <dt className="order-2 text-sm text-muted-foreground">
@@ -85,7 +85,7 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
                   {valor === null ? "—" : formatoEntero(valor)}
                 </span>
                 {porcentaje && (
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
+                  <span className="rounded-md neu-hundido px-1.5 py-0.5 text-xs font-medium tabular-nums">
                     {porcentaje}
                   </span>
                 )}

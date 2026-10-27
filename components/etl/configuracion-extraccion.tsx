@@ -1,9 +1,15 @@
 "use client"
 
+import * as React from "react"
+import type { DateRange } from "react-day-picker"
+import { es } from "react-day-picker/locale"
 import {
   AlertTriangleIcon,
+  CalendarRangeIcon,
+  CheckIcon,
   CheckCircle2Icon,
   CircleDashedIcon,
+  CloudDownloadIcon,
   DownloadCloudIcon,
   Loader2Icon,
   RotateCcwIcon,
@@ -12,118 +18,226 @@ import {
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import type { DescargaCiudad, PipelineEtl } from "@/hooks/use-pipeline-etl"
-import { CIUDADES } from "@/lib/etl/ciudades"
+import { CIUDADES, NOMBRES_CIUDADES } from "@/lib/etl/ciudades"
 import {
   calcularVolumen,
+  fechaAMs,
   FECHA_MINIMA,
   hoyUtc,
   MAX_DIAS_EXTRACCION,
 } from "@/lib/etl/extraccion"
+import { cn } from "@/lib/utils"
 
+import { colorCiudad } from "./colores"
+import { EncabezadoPaso } from "./encabezado-paso"
 import { formatoDuracion, formatoEntero } from "./formato"
+
+const MS_DIA = 86_400_000
+const aFecha = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+
+/**
+ * Atajos de periodo. Terminan 6 días antes de hoy porque el archivo histórico
+ * tarda unos días en consolidarse (así no aparecen valores null).
+ */
+function atajosPeriodo(hoy = hoyUtc()) {
+  const fin = fechaAMs(hoy)! - 6 * MS_DIA
+  const d = new Date(fechaAMs(hoy)!)
+  const inicioMesAnterior = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)
+  const finMesAnterior = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 0)
+  return [
+    { titulo: "Última semana", inicio: fin - 6 * MS_DIA, fin },
+    { titulo: "2 semanas", inicio: fin - 13 * MS_DIA, fin },
+    { titulo: "Último mes", inicio: fin - 29 * MS_DIA, fin },
+    { titulo: "Mes anterior", inicio: inicioMesAnterior, fin: finMesAnterior },
+  ].map((a) => ({ ...a, inicio: aFecha(a.inicio), fin: aFecha(a.fin) }))
+}
 
 export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
   const { config, setConfig, validacion, extraccion } = etl
   const volumen = calcularVolumen(config)
   const ocupado = Boolean(extraccion?.enCurso) || Boolean(etl.carga?.enCurso)
+  const atajos = atajosPeriodo()
 
-  const alternarCiudad = (nombre: string, marcar: boolean) =>
+  const alternarCiudad = (nombre: string) =>
     setConfig((c) => ({
       ...c,
-      ciudades: marcar
-        ? [...c.ciudades, nombre]
-        : c.ciudades.filter((x) => x !== nombre),
+      ciudades: c.ciudades.includes(nombre)
+        ? c.ciudades.filter((x) => x !== nombre)
+        : [...c.ciudades, nombre],
     }))
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>1. Configuración de extracción</CardTitle>
-        <CardDescription>
-          API histórica de Open-Meteo · horas en UTC · temperatura en °C ·
-          precipitación en mm · máximo {MAX_DIAS_EXTRACCION} días.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+    <section
+      aria-labelledby="titulo-extraccion"
+      className="flex flex-col gap-4"
+    >
+      <EncabezadoPaso
+        numero={1}
+        id="titulo-extraccion"
+        titulo="Extracción"
+        descripcion={`API histórica de Open-Meteo · horas en UTC · °C, % y mm · máximo ${MAX_DIAS_EXTRACCION} días por extracción.`}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <form
-          className="flex flex-col gap-4"
+          className="flex flex-col gap-6 rounded-3xl neu p-5 sm:p-6"
           onSubmit={(e) => {
             e.preventDefault()
             void etl.extraer()
           }}
         >
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">Ciudades</legend>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {CIUDADES.map((c) => (
-                <Label key={c.nombre} className="font-normal">
-                  <Checkbox
-                    checked={config.ciudades.includes(c.nombre)}
-                    onCheckedChange={(v) => alternarCiudad(c.nombre, v)}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="sr-only">Ciudades</legend>
+            <div className="flex items-center justify-between gap-2">
+              <span aria-hidden className="text-sm font-medium">
+                ¿De qué ciudades?
+              </span>
+              <div className="flex gap-1 text-xs">
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() =>
+                    setConfig((c) => ({
+                      ...c,
+                      ciudades: [...NOMBRES_CIUDADES],
+                    }))
+                  }
+                  className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => setConfig((c) => ({ ...c, ciudades: [] }))}
+                  className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  Ninguna
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {CIUDADES.map((c) => {
+                const marcada = config.ciudades.includes(c.nombre)
+                return (
+                  <button
+                    key={c.nombre}
+                    type="button"
+                    aria-pressed={marcada}
                     disabled={ocupado}
-                  />
-                  {c.nombre}
-                </Label>
-              ))}
+                    onClick={() => alternarCiudad(c.nombre)}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                      marcada
+                        ? "neu-hundido font-medium"
+                        : "neu-sm text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span
+                      aria-hidden
+                      className="flex size-5 shrink-0 items-center justify-center rounded-full transition-colors"
+                      style={{
+                        background: marcada
+                          ? colorCiudad(c.nombre)
+                          : "transparent",
+                        boxShadow: `inset 0 0 0 1.5px ${colorCiudad(c.nombre)}`,
+                      }}
+                    >
+                      {marcada && <CheckIcon className="size-3 text-white" />}
+                    </span>
+                    {c.nombre}
+                  </button>
+                )
+              })}
             </div>
           </fieldset>
 
-          <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="fecha-inicio">Fecha inicial</Label>
-              <Input
-                id="fecha-inicio"
-                type="date"
-                min={FECHA_MINIMA}
-                max={hoyUtc()}
-                value={config.fechaInicio}
-                disabled={ocupado}
-                onChange={(e) =>
-                  setConfig((c) => ({ ...c, fechaInicio: e.target.value }))
-                }
-              />
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-3 text-sm font-medium">¿Qué periodo?</legend>
+            <div className="flex flex-wrap gap-2">
+              {atajos.map((a) => {
+                const activo =
+                  config.fechaInicio === a.inicio && config.fechaFin === a.fin
+                return (
+                  <button
+                    key={a.titulo}
+                    type="button"
+                    aria-pressed={activo}
+                    disabled={ocupado}
+                    title={`${a.inicio} → ${a.fin}`}
+                    onClick={() =>
+                      setConfig((c) => ({
+                        ...c,
+                        fechaInicio: a.inicio,
+                        fechaFin: a.fin,
+                      }))
+                    }
+                    className={cn(
+                      "rounded-full px-3.5 py-1.5 text-xs transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                      activo
+                        ? "neu-hundido font-medium text-marca"
+                        : "neu-sm text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {a.titulo}
+                  </button>
+                )
+              })}
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="fecha-fin">Fecha final</Label>
-              <Input
-                id="fecha-fin"
-                type="date"
-                min={FECHA_MINIMA}
-                max={hoyUtc()}
-                value={config.fechaFin}
-                disabled={ocupado}
-                onChange={(e) =>
-                  setConfig((c) => ({ ...c, fechaFin: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+            <SelectorPeriodo
+              inicio={config.fechaInicio}
+              fin={config.fechaFin}
+              ocupado={ocupado}
+              alCambiar={(fechaInicio, fechaFin) =>
+                setConfig((c) => ({ ...c, fechaInicio, fechaFin }))
+              }
+            />
+          </fieldset>
 
-          <p className="text-sm text-muted-foreground" aria-live="polite">
+          <div aria-live="polite" className="flex flex-col gap-3">
+            <span className="text-sm font-medium">Volumen previsto</span>
             {volumen && validacion.errores.length === 0 ? (
               <>
-                Volumen previsto:{" "}
-                <strong className="text-foreground">
-                  {formatoEntero(volumen.registrosPrevistos)} registros
-                </strong>{" "}
-                ({config.ciudades.length} ciudades × {volumen.dias} días × 24 h)
-                en {volumen.peticiones} peticiones, una por ciudad.
+                <p className="flex flex-wrap items-center gap-2 text-sm">
+                  <Factor valor={config.ciudades.length} unidad="ciudades" />
+                  <span className="text-muted-foreground">×</span>
+                  <Factor valor={volumen.dias} unidad="días" />
+                  <span className="text-muted-foreground">×</span>
+                  <Factor valor={24} unidad="horas" />
+                  <span className="text-muted-foreground">=</span>
+                  <span className="text-2xl font-semibold tracking-tight tabular-nums">
+                    {formatoEntero(volumen.registrosPrevistos)}
+                  </span>
+                  <span className="text-muted-foreground">registros</span>
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-3 overflow-hidden rounded-full neu-hundido p-0.5">
+                    <div
+                      className="h-full rounded-full bg-marca transition-[width] duration-500"
+                      style={{
+                        width: `${(volumen.dias / MAX_DIAS_EXTRACCION) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {volumen.dias} de {MAX_DIAS_EXTRACCION} días permitidos ·{" "}
+                    {volumen.peticiones} peticiones (una por ciudad)
+                  </span>
+                </div>
               </>
             ) : (
-              "Corrige la configuración para calcular el volumen."
+              <p className="text-sm text-muted-foreground">
+                Corrige la configuración para calcular el volumen.
+              </p>
             )}
-          </p>
+          </div>
 
           {validacion.errores.length > 0 && (
             <Alert variant="destructive">
@@ -144,25 +258,132 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
             </Alert>
           ))}
 
-          <div>
-            <Button
-              type="submit"
-              size="lg"
-              disabled={ocupado || validacion.errores.length > 0}
-            >
-              {extraccion?.enCurso ? (
-                <Loader2Icon className="animate-spin" aria-hidden />
-              ) : (
-                <DownloadCloudIcon aria-hidden />
-              )}
-              Extraer datos
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            size="lg"
+            className="h-11 rounded-xl text-sm"
+            disabled={ocupado || validacion.errores.length > 0}
+          >
+            {extraccion?.enCurso ? (
+              <Loader2Icon className="animate-spin" aria-hidden />
+            ) : (
+              <DownloadCloudIcon aria-hidden />
+            )}
+            Extraer datos
+          </Button>
         </form>
 
         <ProgresoExtraccion etl={etl} />
-      </CardContent>
-    </Card>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * El calendario trabaja con fechas locales; la configuración, con "AAAA-MM-DD".
+ * Se convierte por componentes (año, mes, día) para no desplazar el día por la zona horaria.
+ */
+const aLocal = (fecha: string) => {
+  const [a, m, d] = fecha.split("-").map(Number)
+  return new Date(a, m - 1, d)
+}
+const aTexto = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+const fechaLarga = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+})
+
+/** Un botón con el periodo que abre el calendario de rango de shadcn. */
+function SelectorPeriodo({
+  inicio,
+  fin,
+  ocupado,
+  alCambiar,
+}: {
+  inicio: string
+  fin: string
+  ocupado: boolean
+  alCambiar: (inicio: string, fin: string) => void
+}) {
+  const [abierto, setAbierto] = React.useState(false)
+  // Rango a medio elegir (solo el primer día) mientras el calendario está abierto.
+  const [borrador, setBorrador] = React.useState<DateRange | undefined>()
+  const valido = fechaAMs(inicio) !== null && fechaAMs(fin) !== null
+  const actual: DateRange | undefined = valido
+    ? { from: aLocal(inicio), to: aLocal(fin) }
+    : undefined
+  const hoy = aLocal(hoyUtc())
+  const dias = valido
+    ? Math.round((fechaAMs(fin)! - fechaAMs(inicio)!) / MS_DIA) + 1
+    : null
+
+  return (
+    <Popover
+      open={abierto}
+      onOpenChange={(v) => {
+        setAbierto(v)
+        setBorrador(undefined)
+      }}
+    >
+      <PopoverTrigger
+        disabled={ocupado}
+        className="flex h-11 w-full items-center gap-3 rounded-xl neu-hundido px-3.5 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 sm:max-w-md"
+      >
+        <CalendarRangeIcon aria-hidden className="size-4 text-marca" />
+        <span className="flex-1 tabular-nums">
+          {actual?.from && actual.to
+            ? `${fechaLarga.format(actual.from)} → ${fechaLarga.format(actual.to)}`
+            : "Elige un periodo"}
+        </span>
+        {dias !== null && dias > 0 && (
+          <span className="rounded-full bg-marca/15 px-2 py-0.5 text-xs tabular-nums">
+            {dias} {dias === 1 ? "día" : "días"}
+          </span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto rounded-2xl p-3">
+        <Calendar
+          mode="range"
+          locale={es}
+          numberOfMonths={2}
+          // Con dos meses, los días "de fuera" duplicarían el rango y confunden.
+          showOutsideDays={false}
+          captionLayout="dropdown"
+          resetOnSelect
+          max={MAX_DIAS_EXTRACCION}
+          selected={borrador ?? actual}
+          defaultMonth={actual?.from}
+          startMonth={aLocal(FECHA_MINIMA)}
+          endMonth={hoy}
+          disabled={[{ before: aLocal(FECHA_MINIMA) }, { after: hoy }]}
+          onSelect={(r) => {
+            setBorrador(r)
+            // El rango se aplica al elegir el segundo día.
+            if (r?.from && r.to && borrador?.from) {
+              alCambiar(aTexto(r.from), aTexto(r.to))
+              setAbierto(false)
+              setBorrador(undefined)
+            }
+          }}
+        />
+        <p className="px-1 text-xs text-muted-foreground">
+          {borrador?.from && !borrador.to
+            ? "Ahora elige el último día."
+            : `Pulsa el primer día y después el último (máximo ${MAX_DIAS_EXTRACCION} días).`}
+        </p>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function Factor({ valor, unidad }: { valor: number; unidad: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-1 rounded-xl neu-sm px-2.5 py-1">
+      <span className="font-semibold tabular-nums">{valor}</span>
+      <span className="text-xs text-muted-foreground">{unidad}</span>
+    </span>
   )
 }
 
@@ -177,32 +398,43 @@ function ProgresoExtraccion({ etl }: { etl: PipelineEtl }) {
   const { extraccion } = etl
   if (!extraccion) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-        Aún no se ha extraído nada. Las respuestas originales se guardarán en
-        esta sesión del navegador.
+      <div className="flex flex-col items-center justify-center gap-3 rounded-3xl neu-hundido p-8 text-center text-sm text-muted-foreground">
+        <span className="flex size-14 items-center justify-center rounded-2xl neu-sm">
+          <CloudDownloadIcon aria-hidden className="size-6 text-marca" />
+        </span>
+        <p className="max-w-64">
+          Aún no se ha extraído nada. Aquí verás el progreso de cada ciudad; las
+          respuestas originales se guardan en esta sesión del navegador.
+        </p>
       </div>
     )
   }
 
+  const total = extraccion.descargas.length
   const procesadas = extraccion.descargas.filter(
     (d) => d.estado === "ok" || d.estado === "error"
   ).length
-  const pendientes = extraccion.descargas.length - procesadas
+  const fraccion = total ? procesadas / total : 0
 
   return (
     <section
       aria-label="Progreso de la extracción"
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-5 rounded-3xl neu p-5 sm:p-6"
     >
-      <p className="text-sm font-medium" aria-live="polite">
-        Ciudades procesadas: {procesadas} de {extraccion.descargas.length}
-        {pendientes > 0 && ` · pendientes: ${pendientes}`}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        Periodo extraído: {extraccion.config.fechaInicio} →{" "}
-        {extraccion.config.fechaFin} (UTC)
-      </p>
-      <ul className="flex flex-col divide-y rounded-lg border">
+      <div className="flex items-center gap-4">
+        <Anillo fraccion={fraccion} />
+        <div>
+          <p className="font-medium" aria-live="polite">
+            {procesadas} de {total} ciudades procesadas
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {extraccion.config.fechaInicio} → {extraccion.config.fechaFin} (UTC)
+            {extraccion.duracionMs !== null &&
+              ` · ${formatoDuracion(extraccion.duracionMs)}`}
+          </p>
+        </div>
+      </div>
+      <ul className="flex flex-col gap-3">
         {extraccion.descargas.map((d) => (
           <FilaDescarga
             key={d.ciudad}
@@ -213,6 +445,40 @@ function ProgresoExtraccion({ etl }: { etl: PipelineEtl }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+/** Anillo de progreso; `pathLength` evita trigonometría (hidratación estable). */
+function Anillo({ fraccion }: { fraccion: number }) {
+  return (
+    <div className="relative size-16 shrink-0 rounded-full neu-sm">
+      <svg viewBox="0 0 40 40" aria-hidden className="size-full -rotate-90">
+        <circle
+          cx="20"
+          cy="20"
+          r="15"
+          fill="none"
+          strokeWidth="4"
+          className="stroke-muted"
+        />
+        {fraccion > 0 && (
+          <circle
+            cx="20"
+            cy="20"
+            r="15"
+            fill="none"
+            strokeWidth="4"
+            strokeLinecap="round"
+            pathLength={100}
+            strokeDasharray={`${fraccion * 100} 100`}
+            className="stroke-marca transition-[stroke-dasharray] duration-500"
+          />
+        )}
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold tabular-nums">
+        {Math.round(fraccion * 100)}%
+      </span>
+    </div>
   )
 }
 
@@ -230,29 +496,45 @@ function FilaDescarga({
     ? (d.json.hourly.time as unknown[]).length
     : null
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-      <Icono
-        aria-hidden
-        className={
-          d.estado === "descargando"
-            ? "size-4 animate-spin text-sky-600"
-            : d.estado === "ok"
-              ? "size-4 text-emerald-600"
-              : d.estado === "error"
-                ? "size-4 text-red-600"
-                : "size-4 text-muted-foreground"
-        }
-      />
-      <span className="min-w-20 font-medium">{d.ciudad}</span>
-      <span className="text-muted-foreground">{texto}</span>
-      {d.estado === "ok" && horas !== null && (
-        <span className="text-muted-foreground tabular-nums">
-          {formatoEntero(horas)} horas · {formatoDuracion(d.duracionMs)}
-        </span>
-      )}
+    <li className="flex flex-col gap-1.5 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Icono
+          aria-hidden
+          className={cn(
+            "size-4",
+            d.estado === "descargando" && "animate-spin text-marca",
+            d.estado === "ok" && "text-emerald-600",
+            d.estado === "error" && "text-red-600",
+            d.estado === "pendiente" && "text-muted-foreground"
+          )}
+        />
+        <span className="min-w-20 font-medium">{d.ciudad}</span>
+        <span className="text-muted-foreground">{texto}</span>
+        {d.estado === "ok" && horas !== null && (
+          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+            {formatoEntero(horas)} h · {formatoDuracion(d.duracionMs)}
+          </span>
+        )}
+      </div>
+      <div aria-hidden className="h-2 overflow-hidden rounded-full neu-hundido">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            d.estado === "descargando" && "w-2/3 animate-pulse",
+            d.estado === "ok" && "w-full",
+            d.estado === "error" && "w-full bg-red-600/70",
+            d.estado === "pendiente" && "w-0"
+          )}
+          style={
+            d.estado === "error"
+              ? undefined
+              : { background: colorCiudad(d.ciudad) }
+          }
+        />
+      </div>
       {d.estado === "error" && (
-        <>
-          <span className="basis-full text-xs text-red-700 dark:text-red-300">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex-1 text-xs text-red-700 dark:text-red-300">
             {d.error}
           </span>
           <Button
@@ -264,7 +546,7 @@ function FilaDescarga({
             <RotateCcwIcon aria-hidden />
             Reintentar {d.ciudad}
           </Button>
-        </>
+        </div>
       )}
     </li>
   )

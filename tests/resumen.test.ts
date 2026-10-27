@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  distribucionPorRangos,
   escalaEje,
   motivosFrecuentes,
   resumirPorCiudad,
+  seriesPorDia,
 } from "@/lib/etl/resumen"
 import type { RegistroRechazado, RegistroValido } from "@/lib/etl/tipos"
 
@@ -51,6 +53,55 @@ describe("resumirPorCiudad", () => {
       ciudades: [],
       global: 0,
     })
+  })
+})
+
+describe("seriesPorDia", () => {
+  it("agrupa por ciudad y día y deja null los días sin datos", () => {
+    const otroDia = {
+      ...valido("Bilbao", 3, 30),
+      fecha_hora: "2026-09-02T03:00:00Z",
+    }
+    const r = seriesPorDia(
+      [valido("Madrid", 0, 10), valido("Madrid", 1, 20), otroDia],
+      "temperatura"
+    )
+    expect(r.dias).toEqual(["2026-09-01", "2026-09-02"])
+    expect(r.series).toEqual([
+      { ciudad: "Madrid", valores: [15, null] },
+      { ciudad: "Bilbao", valores: [null, 30] },
+    ])
+  })
+
+  it("suma la precipitación del día", () => {
+    const r = seriesPorDia(
+      [valido("Madrid", 0, 10, 1.5), valido("Madrid", 1, 10, 2)],
+      "precipitacion"
+    )
+    expect(r.series[0].valores).toEqual([3.5])
+  })
+})
+
+describe("distribucionPorRangos", () => {
+  it("reparte las horas por rango con límites superiores exclusivos", () => {
+    const r = distribucionPorRangos(
+      [9.9, 10, 25, 30, 41].map((t, i) => valido("Madrid", i, t)),
+      "temperatura"
+    )
+    expect(r.map((x) => x.horas)).toEqual([1, 1, 1, 2])
+  })
+
+  it("cuenta como «sin lluvia» las horas con 0 mm", () => {
+    const r = distribucionPorRangos(
+      [0, 0, 0.5, 6].map((p, i) => valido("Madrid", i, 20, p)),
+      "precipitacion"
+    )
+    expect(r).toEqual([
+      { etiqueta: "Sin lluvia", horas: 2 },
+      { etiqueta: "0,1–1 mm", horas: 1 },
+      { etiqueta: "1–4 mm", horas: 0 },
+      { etiqueta: "≥ 4 mm", horas: 1 },
+    ])
   })
 })
 

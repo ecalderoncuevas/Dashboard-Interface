@@ -6,40 +6,65 @@ import { ArrowUpRightIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { PipelineEtl } from "@/hooks/use-pipeline-etl"
 import { motivosFrecuentes } from "@/lib/etl/resumen"
+import { cn } from "@/lib/utils"
 
 import type { Destino } from "./aplicacion-etl"
 import { formatoEntero, formatoPorcentaje } from "./formato"
 
-const SEGMENTOS = 24
-
-/** Medidor semicircular por segmentos: cada segmento es 1/24 del total. */
-function Medidor({ fraccion }: { fraccion: number | null }) {
-  const llenos = fraccion === null ? 0 : Math.round(fraccion * SEGMENTOS)
+/**
+ * Arco semicircular. `pathLength=100` permite expresar el relleno en % sin
+ * trigonometría (que difiere entre Node y el navegador y rompería la hidratación).
+ */
+function Arco({
+  radio,
+  fraccion,
+  className,
+}: {
+  radio: number
+  fraccion: number | null
+  className: string
+}) {
+  const d = `M${100 - radio},100 A${radio},${radio} 0 0 1 ${100 + radio},100`
   return (
-    <svg viewBox="0 0 200 108" aria-hidden className="w-full max-w-60">
-      {Array.from({ length: SEGMENTOS }, (_, i) => {
-        const a = Math.PI - ((i + 0.5) / SEGMENTOS) * Math.PI
-        // Redondeado: Node y el navegador difieren en los últimos decimales
-        // de Math.sin y eso rompería la hidratación.
-        const punto = (r: number) =>
-          [100 + r * Math.cos(a), 100 - r * Math.sin(a)].map(
-            (v) => Math.round(v * 100) / 100
-          )
-        const [x1, y1] = punto(72)
-        const [x2, y2] = punto(92)
-        return (
-          <line
-            key={i}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            strokeWidth={8}
-            strokeLinecap="round"
-            className={i < llenos ? "stroke-primary" : "stroke-muted"}
-          />
-        )
-      })}
+    <>
+      <path
+        d={d}
+        fill="none"
+        strokeWidth={14}
+        strokeLinecap="round"
+        className="stroke-muted"
+      />
+      {fraccion !== null && fraccion > 0 && (
+        <path
+          d={d}
+          pathLength={100}
+          fill="none"
+          strokeWidth={14}
+          strokeLinecap="round"
+          strokeDasharray={`${fraccion * 100} 100`}
+          className={cn(
+            "transition-[stroke-dasharray] duration-700",
+            className
+          )}
+        />
+      )}
+    </>
+  )
+}
+
+/** Medidor de dos arcos concéntricos: calidad (fuera) y selección (dentro). */
+function Medidor({
+  calidad,
+  seleccion,
+}: {
+  calidad: number | null
+  seleccion: number | null
+}) {
+  return (
+    <svg viewBox="0 0 200 110" aria-hidden className="w-full max-w-64">
+      {/* chart-2 es musgo en ambos temas, así el arco exterior no se confunde con el naranja. */}
+      <Arco radio={88} fraccion={calidad} className="stroke-chart-2" />
+      <Arco radio={64} fraccion={seleccion} className="stroke-marca" />
     </svg>
   )
 }
@@ -55,6 +80,7 @@ export function TarjetaCalidad({
   const validos = limpieza?.validos.length ?? 0
   const rechazados = limpieza?.rechazados.length ?? 0
   const total = validos + rechazados
+  const listos = etl.conjuntoCarga.registros.length
   const motivos = React.useMemo(
     () => (limpieza ? motivosFrecuentes(limpieza.rechazados) : []),
     [limpieza]
@@ -63,7 +89,7 @@ export function TarjetaCalidad({
   return (
     <section
       aria-labelledby="titulo-calidad"
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
+      className="flex flex-col gap-4 rounded-3xl neu p-4 sm:p-5"
     >
       <header className="flex items-start justify-between gap-3">
         <div>
@@ -75,9 +101,9 @@ export function TarjetaCalidad({
           </p>
         </div>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="rounded-full"
+          className="rounded-full neu-sm"
           aria-label="Ver los registros rechazados"
           onClick={() => navegar("rechazados")}
         >
@@ -86,7 +112,10 @@ export function TarjetaCalidad({
       </header>
 
       <div className="relative mx-auto flex w-full justify-center">
-        <Medidor fraccion={total > 0 ? validos / total : null} />
+        <Medidor
+          calidad={total > 0 ? validos / total : null}
+          seleccion={validos > 0 ? listos / validos : null}
+        />
         <p className="absolute inset-x-0 bottom-0 text-center">
           <span className="block text-3xl font-semibold tracking-tight tabular-nums">
             {formatoPorcentaje(validos, total)}
@@ -94,6 +123,23 @@ export function TarjetaCalidad({
           <span className="text-xs text-muted-foreground">válidos</span>
         </p>
       </div>
+
+      <ul className="flex flex-col gap-1.5 text-sm">
+        <li className="flex items-center gap-2">
+          <span aria-hidden className="size-2.5 rounded-full bg-chart-2" />
+          <span className="flex-1">Válidos sobre extraídos</span>
+          <span className="font-medium tabular-nums">
+            {formatoPorcentaje(validos, total)}
+          </span>
+        </li>
+        <li className="flex items-center gap-2">
+          <span aria-hidden className="size-2.5 rounded-full bg-marca" />
+          <span className="flex-1">Listos para cargar</span>
+          <span className="font-medium tabular-nums">
+            {formatoPorcentaje(listos, validos)}
+          </span>
+        </li>
+      </ul>
 
       <dl className="grid grid-cols-2 gap-2 text-center">
         <div>

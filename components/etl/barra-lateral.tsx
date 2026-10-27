@@ -6,11 +6,13 @@ import {
   CloudSunIcon,
   DatabaseIcon,
   LayoutDashboardIcon,
+  MapIcon,
   RefreshCwIcon,
   Table2Icon,
   WorkflowIcon,
 } from "lucide-react"
 
+import { BotonTema } from "@/components/selector-tema"
 import { Button } from "@/components/ui/button"
 import type { PipelineEtl } from "@/hooks/use-pipeline-etl"
 import type { EstadoSupabase } from "@/lib/etl/api-cliente"
@@ -19,6 +21,7 @@ import { cn } from "@/lib/utils"
 import { formatoEntero } from "./formato"
 
 export const SECCIONES = [
+  { id: "mapa", titulo: "Mapa", icono: MapIcon },
   { id: "resumen", titulo: "Resumen", icono: LayoutDashboardIcon },
   { id: "extraccion", titulo: "Extracción", icono: CloudDownloadIcon },
   { id: "pipeline", titulo: "Pipeline", icono: WorkflowIcon },
@@ -68,7 +71,7 @@ function Navegacion({
               aria-current={activa === id ? "location" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
-                activa === id && "bg-muted font-medium"
+                activa === id && "bg-accent font-medium text-accent-foreground"
               )}
             >
               <Icono aria-hidden className="size-4" />
@@ -168,10 +171,16 @@ export function BarraLateral({ etl }: { etl: PipelineEtl }) {
       <aside className="sticky top-0 hidden h-svh flex-col gap-8 border-r bg-card p-5 lg:flex">
         <Marca />
         <Navegacion etl={etl} />
-        <TarjetaSupabase etl={etl} className="mt-auto" />
+        <div className="mt-auto flex flex-col gap-4">
+          <BotonTema conTexto />
+          <TarjetaSupabase etl={etl} />
+        </div>
       </aside>
       <header className="sticky top-0 z-20 flex flex-col gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur lg:hidden">
-        <Marca />
+        <div className="flex items-center justify-between gap-3">
+          <Marca />
+          <BotonTema />
+        </div>
         <Navegacion etl={etl} horizontal />
       </header>
     </>
@@ -181,10 +190,10 @@ export function BarraLateral({ etl }: { etl: PipelineEtl }) {
 function Marca() {
   return (
     <a
-      href="#resumen"
+      href="#mapa"
       className="flex items-center gap-2.5 font-semibold tracking-tight"
     >
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <span className="flex size-8 items-center justify-center rounded-lg bg-marca text-marca-foreground">
         <CloudSunIcon aria-hidden className="size-4.5" />
       </span>
       Meteo ETL

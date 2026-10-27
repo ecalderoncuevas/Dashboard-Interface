@@ -21,8 +21,7 @@ const ESTADOS: Record<
   en_curso: {
     texto: "En curso",
     icono: Loader2Icon,
-    clase:
-      "border-sky-600/30 bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
+    clase: "border-marca/40 bg-accent text-accent-foreground dark:bg-marca/15",
   },
   completada: {
     texto: "Completada",

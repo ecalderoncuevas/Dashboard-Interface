@@ -58,6 +58,86 @@ export function resumirPorCiudad(
   return { ciudades, global }
 }
 
+export interface SerieCiudad {
+  ciudad: string
+  /** Un valor por día de `dias`; null si la ciudad no tiene horas válidas ese día. */
+  valores: (number | null)[]
+}
+
+export interface SeriesDiarias {
+  /** Días "AAAA-MM-DD" (UTC) en orden cronológico. */
+  dias: string[]
+  series: SerieCiudad[]
+}
+
+/** Agrega por ciudad y día (media o suma según la métrica) para el gráfico de líneas. */
+export function seriesPorDia(
+  validos: readonly RegistroValido[],
+  metrica: Metrica
+): SeriesDiarias {
+  const campo = CAMPOS[metrica]
+  const media = METRICAS[metrica].agregado === "media"
+  const acumulado = new Map<string, Map<string, { suma: number; n: number }>>()
+  const dias = new Set<string>()
+  for (const r of validos) {
+    const dia = r.fecha_hora.slice(0, 10)
+    dias.add(dia)
+    const porDia = acumulado.get(r.ciudad) ?? new Map()
+    const a = porDia.get(dia) ?? { suma: 0, n: 0 }
+    a.suma += r[campo]
+    a.n++
+    porDia.set(dia, a)
+    acumulado.set(r.ciudad, porDia)
+  }
+  const ordenados = [...dias].sort()
+  return {
+    dias: ordenados,
+    series: [...acumulado].map(([ciudad, porDia]) => ({
+      ciudad,
+      valores: ordenados.map((d) => {
+        const a = porDia.get(d)
+        return a ? (media ? a.suma / a.n : a.suma) : null
+      }),
+    })),
+  }
+}
+
+/** Rangos ordenados de cada métrica; cada uno incluye los valores < `hasta`. */
+export const RANGOS: Record<Metrica, { etiqueta: string; hasta: number }[]> = {
+  temperatura: [
+    { etiqueta: "< 10 °C", hasta: 10 },
+    { etiqueta: "10–20 °C", hasta: 20 },
+    { etiqueta: "20–30 °C", hasta: 30 },
+    { etiqueta: "≥ 30 °C", hasta: Infinity },
+  ],
+  humedad: [
+    { etiqueta: "< 40 %", hasta: 40 },
+    { etiqueta: "40–60 %", hasta: 60 },
+    { etiqueta: "60–80 %", hasta: 80 },
+    { etiqueta: "≥ 80 %", hasta: Infinity },
+  ],
+  precipitacion: [
+    { etiqueta: "Sin lluvia", hasta: 0.1 },
+    { etiqueta: "0,1–1 mm", hasta: 1 },
+    { etiqueta: "1–4 mm", hasta: 4 },
+    { etiqueta: "≥ 4 mm", hasta: Infinity },
+  ],
+}
+
+/** Cuántas horas válidas caen en cada rango de la métrica (parte de un todo). */
+export function distribucionPorRangos(
+  validos: readonly RegistroValido[],
+  metrica: Metrica
+): { etiqueta: string; horas: number }[] {
+  const campo = CAMPOS[metrica]
+  const rangos = RANGOS[metrica]
+  const horas = rangos.map(() => 0)
+  for (const r of validos) {
+    horas[rangos.findIndex((x) => r[campo] < x.hasta)]++
+  }
+  return rangos.map((x, i) => ({ etiqueta: x.etiqueta, horas: horas[i] }))
+}
+
 export interface Escala {
   min: number
   max: number

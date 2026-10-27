@@ -60,7 +60,7 @@ export function TarjetaEstadoPipeline({
   return (
     <section
       aria-labelledby="titulo-estado-pipeline"
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
+      className="flex flex-col gap-4 rounded-3xl neu p-4 sm:p-5"
     >
       <header className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
@@ -79,9 +79,9 @@ export function TarjetaEstadoPipeline({
           />
         </div>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="rounded-full"
+          className="rounded-full neu-sm"
           aria-label="Ver el pipeline completo"
           onClick={() => navegar("pipeline")}
         >
@@ -98,16 +98,18 @@ export function TarjetaEstadoPipeline({
             {Math.round((completadas / fases.length) * 100)} %
           </span>
         </div>
-        <div aria-hidden className="grid grid-cols-5 gap-1">
+        <div
+          aria-hidden
+          className="grid grid-cols-5 gap-1 rounded-full neu-hundido p-1"
+        >
           {fases.map((f) => (
             <span
               key={f.id}
               className={cn(
                 "block h-2.5 rounded-full",
                 f.estado === "completada" && "bg-primary",
-                f.estado === "en_curso" && "animate-pulse bg-primary/50",
-                f.estado === "error" && "bg-destructive",
-                f.estado === "pendiente" && "bg-muted"
+                f.estado === "en_curso" && "animate-pulse bg-marca",
+                f.estado === "error" && "bg-destructive"
               )}
             />
           ))}
@@ -122,8 +124,8 @@ export function TarjetaEstadoPipeline({
               className={cn(
                 "flex size-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] tabular-nums",
                 f === actual
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+                  ? "bg-marca text-marca-foreground"
+                  : "neu-sm text-muted-foreground"
               )}
             >
               {i + 1}
@@ -144,9 +146,8 @@ export function TarjetaEstadoPipeline({
       </div>
 
       <Button
-        variant="outline"
         size="lg"
-        className="mt-auto w-full"
+        className="mt-auto w-full rounded-xl"
         onClick={() =>
           navegar(
             !actual

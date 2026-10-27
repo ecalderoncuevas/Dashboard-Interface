@@ -66,13 +66,13 @@ export function ActividadReciente({ etl }: { etl: PipelineEtl }) {
   return (
     <section
       aria-labelledby="titulo-actividad"
-      className="flex flex-col gap-3 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 sm:p-5"
+      className="flex flex-col gap-3 rounded-3xl neu p-4 sm:p-5"
     >
       <h2 id="titulo-actividad" className="text-base font-medium">
         Actividad reciente
       </h2>
       {filas.length === 0 ? (
-        <p className="flex flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <p className="flex flex-1 items-center justify-center rounded-2xl neu-hundido p-6 text-center text-sm text-muted-foreground">
           Aquí aparecerán las descargas de cada ciudad y los lotes subidos a
           Supabase.
         </p>
@@ -85,7 +85,7 @@ export function ActividadReciente({ etl }: { etl: PipelineEtl }) {
             >
               <span
                 aria-hidden
-                className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+                className="flex size-9 items-center justify-center rounded-full neu-sm text-xs font-semibold"
               >
                 {f.icono}
               </span>

@@ -21,6 +21,8 @@
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
+    --color-marca: var(--marca);
+    --color-marca-foreground: var(--marca-foreground);
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
@@ -47,73 +49,176 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Paleta del proyecto:
+ *   Persian orange #CF8852 → oklch(0.688 0.112 56.8)   acento / marca
+ *   Platinum       #E8E7E3 → oklch(0.928 0.005 95.1)   superficies (claro) y texto (oscuro)
+ *   Dark moss      #525333 → oklch(0.433 0.049 109.8)  primario (claro) y fondos (oscuro)
+ * Modo claro: platino de fondo, musgo como color principal y naranja de acento.
+ * Modo oscuro: fondos de musgo muy oscuro, texto platino y naranja como principal.
+ */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --background: oklch(0.955 0.005 95.1);
+    --foreground: oklch(0.24 0.03 109.8);
+    --card: oklch(0.99 0.003 95.1);
+    --card-foreground: oklch(0.24 0.03 109.8);
+    --popover: oklch(0.99 0.003 95.1);
+    --popover-foreground: oklch(0.24 0.03 109.8);
+    --primary: oklch(0.433 0.049 109.8);
+    --primary-foreground: oklch(0.97 0.005 95.1);
+    --secondary: oklch(0.928 0.005 95.1);
+    --secondary-foreground: oklch(0.3 0.04 109.8);
+    --muted: oklch(0.928 0.005 95.1);
+    --muted-foreground: oklch(0.48 0.025 109.8);
+    --accent: oklch(0.92 0.035 56.8);
+    --accent-foreground: oklch(0.4 0.09 50);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --border: oklch(0.87 0.01 95.1);
+    --input: oklch(0.85 0.012 95.1);
+    --ring: oklch(0.688 0.112 56.8);
+    --marca: oklch(0.688 0.112 56.8);
+    --marca-foreground: oklch(0.99 0.003 95.1);
+    --chart-1: oklch(0.688 0.112 56.8);
+    --chart-2: oklch(0.433 0.049 109.8);
+    --chart-3: oklch(0.57 0.105 52.8);
+    --chart-4: oklch(0.6 0.05 109.8);
+    --chart-5: oklch(0.46 0.085 48.8);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* Neumorfismo: luz arriba a la izquierda, sombra abajo a la derecha. */
+    --neu-luz: oklch(1 0 0 / 0.95);
+    --neu-sombra: oklch(0.55 0.03 100 / 0.3);
+    /* Un color por ciudad (orden fijo de lib/etl/ciudades.ts), validado para daltonismo. */
+    --ciudad-1: #14998a;
+    --ciudad-2: #c4773d;
+    --ciudad-3: #3f6fb0;
+    --ciudad-4: #7d8a2a;
+    --ciudad-5: #a8508a;
+    /* Rampa ordinal de rangos (anillo): un solo tono naranja, de claro a oscuro. */
+    --rango-1: #e1a67b;
+    --rango-2: #cc854f;
+    --rango-3: #a76438;
+    --rango-4: #7e482a;
+    --sidebar: oklch(0.99 0.003 95.1);
+    --sidebar-foreground: oklch(0.24 0.03 109.8);
+    --sidebar-primary: oklch(0.433 0.049 109.8);
+    --sidebar-primary-foreground: oklch(0.97 0.005 95.1);
+    --sidebar-accent: oklch(0.928 0.005 95.1);
+    --sidebar-accent-foreground: oklch(0.24 0.03 109.8);
+    --sidebar-border: oklch(0.87 0.01 95.1);
+    --sidebar-ring: oklch(0.688 0.112 56.8);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: oklch(0.19 0.014 109.8);
+    --foreground: oklch(0.928 0.005 95.1);
+    --card: oklch(0.235 0.018 109.8);
+    --card-foreground: oklch(0.928 0.005 95.1);
+    --popover: oklch(0.235 0.018 109.8);
+    --popover-foreground: oklch(0.928 0.005 95.1);
+    --primary: oklch(0.72 0.112 56.8);
+    --primary-foreground: oklch(0.2 0.03 56.8);
+    --secondary: oklch(0.3 0.025 109.8);
+    --secondary-foreground: oklch(0.928 0.005 95.1);
+    --muted: oklch(0.29 0.022 109.8);
+    --muted-foreground: oklch(0.74 0.012 95.1);
+    --accent: oklch(0.33 0.035 109.8);
+    --accent-foreground: oklch(0.928 0.005 95.1);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --border: oklch(0.928 0.005 95.1 / 12%);
+    --input: oklch(0.928 0.005 95.1 / 16%);
+    --ring: oklch(0.688 0.112 56.8);
+    --marca: oklch(0.72 0.112 56.8);
+    --marca-foreground: oklch(0.2 0.03 56.8);
+    --chart-1: oklch(0.72 0.112 56.8);
+    --chart-2: oklch(0.7 0.06 109.8);
+    --chart-3: oklch(0.82 0.08 60);
+    --chart-4: oklch(0.55 0.05 109.8);
+    --chart-5: oklch(0.6 0.105 52.8);
+    --neu-luz: oklch(0.32 0.022 109.8 / 0.6);
+    --neu-sombra: oklch(0.08 0.01 109.8 / 0.7);
+    --ciudad-1: #16978a;
+    --ciudad-2: #c97a40;
+    --ciudad-3: #5287d0;
+    --ciudad-4: #87942f;
+    --ciudad-5: #bd5f9d;
+    --rango-1: #7e482a;
+    --rango-2: #a76438;
+    --rango-3: #cc854f;
+    --rango-4: #e1a67b;
+    --sidebar: oklch(0.235 0.018 109.8);
+    --sidebar-foreground: oklch(0.928 0.005 95.1);
+    --sidebar-primary: oklch(0.72 0.112 56.8);
+    --sidebar-primary-foreground: oklch(0.2 0.03 56.8);
+    --sidebar-accent: oklch(0.3 0.025 109.8);
+    --sidebar-accent-foreground: oklch(0.928 0.005 95.1);
+    --sidebar-border: oklch(0.928 0.005 95.1 / 12%);
+    --sidebar-ring: oklch(0.688 0.112 56.8);
+}
+
+/* Bloque en relieve: mismo color que el fondo, solo lo separan las sombras. */
+@utility neu {
+    background-color: var(--background);
+    box-shadow:
+        7px 7px 16px var(--neu-sombra),
+        -7px -7px 16px var(--neu-luz);
+}
+
+/* Versión suave para elementos pequeños (botones, chips, nodos). */
+@utility neu-sm {
+    background-color: var(--background);
+    box-shadow:
+        3px 3px 7px var(--neu-sombra),
+        -3px -3px 7px var(--neu-luz);
+}
+
+/* Hundido: pistas de barras, controles segmentados, elementos pulsados. */
+@utility neu-hundido {
+    background-color: var(--background);
+    box-shadow:
+        inset 3px 3px 7px var(--neu-sombra),
+        inset -3px -3px 7px var(--neu-luz);
+}
+
+/* Animaciones de los gráficos (se repiten al cambiar de métrica o de gráfico). */
+
+/* Líneas: barrido de izquierda a derecha... */
+@keyframes grafico-barrido {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+/* ...y una onda amortiguada: suben desde la base, se pasan y se asientan. */
+@keyframes grafico-onda {
+    0% { transform: scaleY(0); }
+    35% { transform: scaleY(1.16); }
+    55% { transform: scaleY(0.92); }
+    72% { transform: scaleY(1.05); }
+    86% { transform: scaleY(0.98); }
+    100% { transform: scaleY(1); }
+}
+/* Barras: crecen desde el eje con un pequeño rebote. */
+@keyframes grafico-crecer {
+    0% { transform: scaleY(0); }
+    60% { transform: scaleY(1.08); }
+    80% { transform: scaleY(0.97); }
+    100% { transform: scaleY(1); }
+}
+/* Quesos: el anillo gira al entrar y cada porción se dibuja en orden. */
+@keyframes grafico-giro {
+    from { transform: rotate(-180deg) scale(0.85); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+@keyframes grafico-porcion {
+    from { stroke-dasharray: 0 300; }
+}
+@keyframes grafico-aparecer {
+    from { opacity: 0; scale: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .grafico-animado,
+    .grafico-animado * {
+        animation: none !important;
+    }
 }
 
 @layer base {
@@ -125,5 +230,10 @@
     }
   html {
     @apply font-sans;
+    }
+  /* Las listas de <select> nativos (también los mes/año del calendario) las
+     pinta el navegador: sin esto, en modo oscuro salía texto claro sobre blanco. */
+  select option {
+    @apply bg-popover text-popover-foreground;
     }
 }
