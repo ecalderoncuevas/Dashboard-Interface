@@ -1,130 +1,128 @@
 "use client"
 
 import * as React from "react"
-import {
-  CalendarIcon,
-  DownloadCloudIcon,
-  Loader2Icon,
-  MapPinIcon,
-} from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { usePipelineEtl } from "@/hooks/use-pipeline-etl"
 
-import { ActividadReciente } from "./actividad-reciente"
-import { BarraLateral, TarjetaSupabase } from "./barra-lateral"
-import { Cobertura } from "./cobertura"
-import { ConfiguracionExtraccion } from "./configuracion-extraccion"
-import { GraficoCiudades } from "./grafico-ciudades"
-import { InspeccionDatos, type Pestana } from "./inspeccion-datos"
+import { BarraSuperior } from "./barra-superior"
+import type { Pestana } from "./inspeccion-datos"
 import { MapaCiudades } from "./mapa-ciudades"
-import { PipelineVisual } from "./pipeline-visual"
-import { TarjetaCalidad } from "./tarjeta-calidad"
-import { TarjetaEstadoPipeline } from "./tarjeta-estado-pipeline"
-import { TarjetasKpi } from "./tarjetas-kpi"
+import { PanelTrabajo, type AnchoPanel, type Vista } from "./panel-trabajo"
+import { calcularFases } from "./pipeline-visual"
 
-/** Una pestaña de inspección o una sección de la página. */
-export type Destino = Pestana | "extraccion" | "pipeline" | "mapa"
+/** Una pestaña de inspección, una vista del panel o el propio mapa. */
+export type Destino = Pestana | Exclude<Vista, "datos"> | "mapa"
 
-const SECCIONES_PAGINA: readonly Destino[] = ["extraccion", "pipeline", "mapa"]
+const CONSULTA_ESCRITORIO = "(min-width: 64rem)"
 
+function useEsEscritorio() {
+  return React.useSyncExternalStore(
+    (aviso) => {
+      const consulta = window.matchMedia(CONSULTA_ESCRITORIO)
+      consulta.addEventListener("change", aviso)
+      return () => consulta.removeEventListener("change", aviso)
+    },
+    () => window.matchMedia(CONSULTA_ESCRITORIO).matches,
+    () => true
+  )
+}
+
+/**
+ * Una sola pantalla sin scroll: el pipeline arriba como navegación, el mapa
+ * como base y un panel de trabajo acoplado a la derecha para configurar,
+ * revisar los datos y cargarlos.
+ */
 export function AplicacionEtl() {
   const etl = usePipelineEtl()
-  const [pestana, setPestana] = React.useState<Pestana>("json")
+  const esEscritorio = useEsEscritorio()
+  const [vista, setVista] = React.useState<Vista>("extraccion")
+  // Datos empieza con todas las secciones cerradas.
+  const [pestana, setPestana] = React.useState<Pestana | null>(null)
+  // Las tablas necesitan sitio: la vista de datos ensancha el panel, salvo
+  // que el usuario ya haya elegido un ancho arrastrando el borde.
+  const [ancho, setAncho] = React.useState<AnchoPanel>(null)
+  // En escritorio el panel empieza abierto; en móvil se empieza por el mapa.
+  const [abierto, setAbierto] = React.useState(true)
+  const [abiertoMovil, setAbiertoMovil] = React.useState(false)
 
-  const navegar = (destino: Destino) => {
-    let id: string = destino
-    if (!SECCIONES_PAGINA.includes(destino)) {
-      setPestana(destino as Pestana)
-      id = "inspeccion"
-    }
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+  const cambiarVista = (v: Vista) => {
+    setVista(v)
+    if (typeof ancho === "number") return
+    // Solo las tablas necesitan el panel ancho; el resto vuelve al tamaño original.
+    setAncho(v === "datos" ? "max" : null)
   }
 
-  const { config, extraccion, validacion } = etl
-  const ocupado = Boolean(extraccion?.enCurso) || Boolean(etl.carga?.enCurso)
+  const abrir = () => {
+    setAbierto(true)
+    setAbiertoMovil(true)
+  }
+  const cerrar = () => {
+    setAbierto(false)
+    setAbiertoMovil(false)
+  }
+
+  const navegar = (destino: Destino) => {
+    if (destino === "mapa") {
+      setAbiertoMovil(false)
+      return
+    }
+    if (
+      destino === "extraccion" ||
+      destino === "resumen" ||
+      destino === "pipeline"
+    ) {
+      cambiarVista(destino)
+    } else {
+      setPestana(destino)
+      cambiarVista("datos")
+    }
+    abrir()
+  }
+
+  React.useEffect(() => {
+    if (!abiertoMovil) return
+    const alPulsarTecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAbiertoMovil(false)
+    }
+    window.addEventListener("keydown", alPulsarTecla)
+    return () => window.removeEventListener("keydown", alPulsarTecla)
+  }, [abiertoMovil])
+
+  const panelAbierto = esEscritorio ? abierto : abiertoMovil
+  const faseActiva = !panelAbierto
+    ? null
+    : vista === "extraccion"
+      ? "extraccion"
+      : vista === "datos"
+        ? (calcularFases(etl).find((f) => f.pestana === pestana)?.id ?? null)
+        : null
 
   return (
-    <div className="min-h-svh bg-background lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <BarraLateral etl={etl} />
-
-      <div className="min-w-0">
-        {/* El mapa ocupa la primera pantalla completa; el panel sigue debajo. */}
-        <div id="mapa" className="scroll-mt-28 lg:scroll-mt-0">
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <BarraSuperior
+        etl={etl}
+        faseActiva={faseActiva}
+        alAbrir={navegar}
+        panelAbierto={panelAbierto}
+        alternarPanel={panelAbierto ? cerrar : abrir}
+      />
+      <div className="flex min-h-0 flex-1">
+        <main className="relative min-w-0 flex-1">
           <MapaCiudades etl={etl} />
-        </div>
-
-        <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-6 sm:px-6 lg:py-10">
-          <section
-            id="resumen"
-            className="flex scroll-mt-28 flex-col gap-6 lg:scroll-mt-6"
-          >
-            <header className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Pipeline ETL: Open-Meteo → Supabase
-                </h1>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Extrae datos meteorológicos horarios, transfórmalos,
-                  límpialos, decide qué registros subir y cárgalos en una base
-                  de datos.
-                </p>
-                <p className="mt-1 flex flex-wrap gap-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 rounded-full neu-sm px-3 py-1">
-                    <CalendarIcon aria-hidden className="size-3.5 text-marca" />
-                    {config.fechaInicio} → {config.fechaFin} (UTC)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full neu-sm px-3 py-1">
-                    <MapPinIcon aria-hidden className="size-3.5 text-marca" />
-                    {config.ciudades.length === 0
-                      ? "Ninguna ciudad"
-                      : config.ciudades.join(", ")}
-                  </span>
-                </p>
-              </div>
-              <Button
-                size="lg"
-                onClick={() => void etl.extraer()}
-                disabled={ocupado || validacion.errores.length > 0}
-              >
-                {extraccion?.enCurso ? (
-                  <Loader2Icon className="animate-spin" aria-hidden />
-                ) : (
-                  <DownloadCloudIcon aria-hidden />
-                )}
-                Extraer datos
-              </Button>
-            </header>
-
-            <TarjetasKpi etl={etl} />
-
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <div className="md:col-span-2">
-                <GraficoCiudades etl={etl} />
-              </div>
-              <TarjetaEstadoPipeline etl={etl} navegar={navegar} />
-              <ActividadReciente etl={etl} />
-              <Cobertura etl={etl} navegar={navegar} />
-              <TarjetaCalidad etl={etl} navegar={navegar} />
-            </div>
-
-            <TarjetaSupabase etl={etl} className="lg:hidden" />
-          </section>
-
-          <div id="extraccion" className="scroll-mt-28 lg:scroll-mt-6">
-            <ConfiguracionExtraccion etl={etl} />
-          </div>
-          <div id="pipeline" className="scroll-mt-28 lg:scroll-mt-6">
-            <PipelineVisual etl={etl} alInspeccionar={navegar} />
-          </div>
-          <InspeccionDatos
-            etl={etl}
-            pestana={pestana}
-            setPestana={setPestana}
-          />
         </main>
+        <PanelTrabajo
+          etl={etl}
+          vista={vista}
+          setVista={cambiarVista}
+          pestana={pestana}
+          setPestana={setPestana}
+          ancho={ancho}
+          setAncho={setAncho}
+          abierto={abierto}
+          abiertoMovil={abiertoMovil}
+          cerrar={cerrar}
+          navegar={navegar}
+        />
       </div>
     </div>
   )

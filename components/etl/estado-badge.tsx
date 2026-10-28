@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import type { EstadoFase } from "@/lib/etl/tipos"
 import { cn } from "@/lib/utils"
 
-const ESTADOS: Record<
+export const ESTADOS: Record<
   EstadoFase,
   { texto: string; icono: typeof CheckCircle2Icon; clase: string }
 > = {

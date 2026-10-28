@@ -94,7 +94,7 @@ export function Cobertura({
   return (
     <section
       aria-labelledby="titulo-cobertura"
-      className="relative flex min-h-72 flex-col gap-4 overflow-hidden rounded-3xl neu p-4 sm:p-5"
+      className="relative flex min-h-72 flex-col gap-4 overflow-hidden rounded-3xl neu p-4 @xl:p-5"
     >
       <header className="flex items-start justify-between gap-3">
         <h2 id="titulo-cobertura" className="text-base font-medium">

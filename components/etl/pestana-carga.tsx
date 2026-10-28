@@ -186,7 +186,7 @@ function InformeCarga({
       </div>
 
       <dl
-        className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4"
+        className="grid grid-cols-2 gap-2 text-sm @xl:grid-cols-4"
         aria-live="polite"
       >
         <Dato titulo="Procesados correctamente" valor={resumen.completados} />

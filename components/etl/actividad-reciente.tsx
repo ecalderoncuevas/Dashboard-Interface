@@ -66,7 +66,7 @@ export function ActividadReciente({ etl }: { etl: PipelineEtl }) {
   return (
     <section
       aria-labelledby="titulo-actividad"
-      className="flex flex-col gap-3 rounded-3xl neu p-4 sm:p-5"
+      className="flex flex-col gap-3 rounded-3xl neu p-4 @xl:p-5"
     >
       <h2 id="titulo-actividad" className="text-base font-medium">
         Actividad reciente
@@ -81,7 +81,7 @@ export function ActividadReciente({ etl }: { etl: PipelineEtl }) {
           {filas.map((f) => (
             <li
               key={f.id}
-              className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 py-2.5 sm:grid-cols-[auto_1fr_auto_5rem]"
+              className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 py-2.5 @xl:grid-cols-[auto_1fr_auto_5rem]"
             >
               <span
                 aria-hidden
@@ -96,7 +96,7 @@ export function ActividadReciente({ etl }: { etl: PipelineEtl }) {
                 </span>
               </span>
               <EstadoBadge estado={f.estado[0]} texto={f.estado[1]} />
-              <span className="col-span-3 text-right text-sm font-medium tabular-nums sm:col-span-1">
+              <span className="col-span-3 text-right text-sm font-medium tabular-nums @xl:col-span-1">
                 {f.valor}
               </span>
             </li>

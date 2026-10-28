@@ -9,7 +9,6 @@ import {
   CheckIcon,
   CheckCircle2Icon,
   CircleDashedIcon,
-  CloudDownloadIcon,
   DownloadCloudIcon,
   Loader2Icon,
   RotateCcwIcon,
@@ -85,9 +84,9 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
         descripcion={`API histórica de Open-Meteo · horas en UTC · °C, % y mm · máximo ${MAX_DIAS_EXTRACCION} días por extracción.`}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="grid gap-6 @4xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <form
-          className="flex flex-col gap-6 rounded-3xl neu p-5 sm:p-6"
+          className="flex flex-col gap-6 rounded-3xl neu p-5 @xl:p-6"
           onSubmit={(e) => {
             e.preventDefault()
             void etl.extraer()
@@ -123,7 +122,7 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3">
               {CIUDADES.map((c) => {
                 const marcada = config.ciudades.includes(c.nombre)
                 return (
@@ -329,7 +328,7 @@ function SelectorPeriodo({
     >
       <PopoverTrigger
         disabled={ocupado}
-        className="flex h-11 w-full items-center gap-3 rounded-xl neu-hundido px-3.5 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 sm:max-w-md"
+        className="flex h-11 w-full items-center gap-3 rounded-xl neu-hundido px-3.5 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60 @xl:max-w-md"
       >
         <CalendarRangeIcon aria-hidden className="size-4 text-marca" />
         <span className="flex-1 tabular-nums">
@@ -396,19 +395,8 @@ const ICONOS_DESCARGA = {
 
 function ProgresoExtraccion({ etl }: { etl: PipelineEtl }) {
   const { extraccion } = etl
-  if (!extraccion) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-3xl neu-hundido p-8 text-center text-sm text-muted-foreground">
-        <span className="flex size-14 items-center justify-center rounded-2xl neu-sm">
-          <CloudDownloadIcon aria-hidden className="size-6 text-marca" />
-        </span>
-        <p className="max-w-64">
-          Aún no se ha extraído nada. Aquí verás el progreso de cada ciudad; las
-          respuestas originales se guardan en esta sesión del navegador.
-        </p>
-      </div>
-    )
-  }
+  // Sin extracción no hay progreso que enseñar: el formulario ocupa todo el sitio.
+  if (!extraccion) return null
 
   const total = extraccion.descargas.length
   const procesadas = extraccion.descargas.filter(
@@ -419,7 +407,7 @@ function ProgresoExtraccion({ etl }: { etl: PipelineEtl }) {
   return (
     <section
       aria-label="Progreso de la extracción"
-      className="flex flex-col gap-5 rounded-3xl neu p-5 sm:p-6"
+      className="flex flex-col gap-5 rounded-3xl neu p-5 @xl:p-6"
     >
       <div className="flex items-center gap-4">
         <Anillo fraccion={fraccion} />

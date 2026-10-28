@@ -60,7 +60,7 @@ export function Segmentado<T extends string>({
                 className={cn("size-3.5", activo && "text-marca")}
               />
             )}
-            <span className={cn(soloIconos && Icono && "hidden sm:inline")}>
+            <span className={cn(soloIconos && Icono && "hidden @xl:inline")}>
               {titulo}
             </span>
           </button>

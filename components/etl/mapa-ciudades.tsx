@@ -4,11 +4,13 @@ import "maplibre-gl/dist/maplibre-gl.css"
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import type { Map as MapaLibre, Marker } from "maplibre-gl"
+import type { Map as MapaLibre, Marker, StyleSpecification } from "maplibre-gl"
 import {
   CheckCircle2Icon,
+  ChevronDownIcon,
   CircleDashedIcon,
   DownloadCloudIcon,
+  LayersIcon,
   Loader2Icon,
   LocateFixedIcon,
   MapIcon,
@@ -16,18 +18,25 @@ import {
   MinimizeIcon,
   MinusIcon,
   PlusIcon,
+  WindIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
+import { useFiltroVisual } from "@/components/filtro-visual"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { EstadoDescarga, PipelineEtl } from "@/hooks/use-pipeline-etl"
 import { CIUDADES, NOMBRES_CIUDADES, type Ciudad } from "@/lib/etl/ciudades"
 import { METRICAS, resumirPorCiudad, type Metrica } from "@/lib/etl/resumen"
+import { FILTROS, type Filtro } from "@/lib/filtro-visual"
 import { cn } from "@/lib/utils"
 
+import { useCapaViento, useVientoActual } from "./capa-viento"
+import { MarcoVintage, RosaVientos } from "./adornos-vintage"
+import { iconoVintage, useCriaturasVintage } from "./decoracion-vintage"
+import { estiloVintage } from "./estilo-vintage"
 import { formatoEntero, formatoMedida, formatoPorcentaje } from "./formato"
 
 const CLAVE_MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY
@@ -48,6 +57,18 @@ function urlEstilo(estilo: Estilo, oscuro: boolean) {
   return `https://api.maptiler.com/maps/${id}/style.json?key=${CLAVE_MAPTILER}`
 }
 
+/** Con el filtro "Vintage" el mapa base es siempre la carta antigua propia. */
+function estiloMapa(
+  estilo: Estilo,
+  oscuro: boolean,
+  vintage: boolean
+): { clave: string; estilo: string | StyleSpecification } {
+  if (vintage)
+    return { clave: `vintage-${oscuro}`, estilo: estiloVintage(oscuro) }
+  const url = urlEstilo(estilo, oscuro)
+  return { clave: url, estilo: url }
+}
+
 const TITULOS_CORTOS: Record<Metrica, string> = {
   temperatura: "Temperatura",
   humedad: "Humedad",
@@ -61,6 +82,9 @@ const TITULOS_CORTOS: Record<Metrica, string> = {
  */
 const RAMPA = ["#e1a67b", "#cc854f", "#a76438", "#7e482a"]
 const RAMPA_OSCURA = ["#7e482a", "#a76438", "#cc854f", "#e1a67b", "#f0c8ab"]
+/** Con el filtro "Vintage": tinta sepia, del pergamino al marrón (los --rango-* de globals.css). */
+const RAMPA_VINTAGE = ["#dcbf8f", "#b98c55", "#8a5f32", "#5b3d1f"]
+const RAMPA_VINTAGE_OSCURA = ["#5b3d1f", "#8a5f32", "#b98c55", "#dcbf8f"]
 
 function interpolar(rampa: readonly string[], t: number) {
   const pos = Math.min(Math.max(t, 0), 1) * (rampa.length - 1)
@@ -87,10 +111,12 @@ const LIMITES: [[number, number], [number, number]] = [
 /** Margen para que las ciudades no queden bajo los paneles flotantes. */
 function ajuste(contenedor: HTMLElement) {
   const { clientWidth: ancho, clientHeight: alto } = contenedor
+  // A la izquierda están el título y la lista de ciudades (unos 20rem de ancho);
+  // en pantallas estrechas, encima.
   const base =
     ancho < 640
-      ? { top: 240, bottom: 140, left: 40, right: 70 }
-      : { top: 130, bottom: 170, left: 90, right: 90 }
+      ? { top: 420, bottom: 40, left: 40, right: 40 }
+      : { top: 110, bottom: 60, left: 290, right: 90 }
   // Si el margen no cabe, MapLibre calcula coordenadas NaN: se reduce en proporción.
   const fx = Math.min(1, (ancho * 0.6) / (base.left + base.right))
   const fy = Math.min(1, (alto * 0.6) / (base.top + base.bottom))
@@ -152,9 +178,15 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const { config, setConfig, extraccion, procesado, validacion } = etl
   const ocupado = Boolean(extraccion?.enCurso) || Boolean(etl.carga?.enCurso)
   const oscuro = useTheme().resolvedTheme === "dark"
+  const [filtro, setFiltro] = useFiltroVisual()
+  const vintage = filtro === "vintage"
 
   const [metrica, setMetrica] = React.useState<Metrica>("temperatura")
   const [estilo, setEstilo] = React.useState<Estilo>("datos")
+  // El viento es decorativo: apagado por defecto y sin recordarse al recargar.
+  const [verViento, setVerViento] = React.useState(false)
+  const [capasAbiertas, setCapasAbiertas] = React.useState(false)
+  const idCapas = React.useId()
   const [activa, setActiva] = React.useState<string | null>(null)
   const [resaltada, setResaltada] = React.useState<string | null>(null)
   const [pantallaCompleta, setPantallaCompleta] = React.useState(false)
@@ -165,7 +197,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const marcoRef = React.useRef<HTMLElement>(null)
   const lienzoRef = React.useRef<HTMLDivElement>(null)
   const mapaRef = React.useRef<MapaLibre | null>(null)
-  const urlRef = React.useRef<string | null>(null)
+  const claveEstiloRef = React.useRef<string | null>(null)
   const [elementos, setElementos] = React.useState<Record<
     string,
     HTMLElement
@@ -175,18 +207,22 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   React.useEffect(() => {
     let cancelado = false
     const marcadores: Marker[] = []
+    let observador: ResizeObserver | undefined
     void import("maplibre-gl").then(({ default: maplibre }) => {
       const lienzo = lienzoRef.current
       if (cancelado || !lienzo) return
-      urlRef.current = urlEstilo(
+      const raiz = document.documentElement
+      const inicial = estiloMapa(
         "datos",
-        document.documentElement.classList.contains("dark")
+        raiz.classList.contains("dark"),
+        raiz.dataset.filtro === "vintage"
       )
+      claveEstiloRef.current = inicial.clave
       // Sin tamaño todavía no se puede encuadrar: se centra en España y punto.
       const conTamano = lienzo.clientWidth > 0 && lienzo.clientHeight > 0
       const mapa = new maplibre.Map({
         container: lienzo,
-        style: urlRef.current,
+        style: inicial.estilo,
         ...(conTamano
           ? { bounds: LIMITES, fitBoundsOptions: ajuste(lienzo) }
           : { center: [-2.5, 40.2] as [number, number], zoom: 5 }),
@@ -195,6 +231,12 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
         locale: TEXTOS_MAPA,
       })
       mapa.once("load", () => setEstadoMapa("listo"))
+      // Los iconos dibujados del estilo vintage se pintan cuando el mapa los pide.
+      mapa.on("styleimagemissing", (e) => {
+        const icono = iconoVintage(e.id)
+        if (icono && !mapa.hasImage(e.id))
+          mapa.addImage(e.id, icono, { pixelRatio: 2 })
+      })
       mapa.on("error", (e) => {
         // Un error de tesela suelta no invalida el mapa; uno de estilo sí.
         if (!mapa.isStyleLoaded() && !mapa.loaded()) setEstadoMapa("error")
@@ -216,11 +258,15 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
         )
         nuevos[c.nombre] = el
       }
+      // MapLibre solo escucha la ventana: el panel lateral cambia el ancho sin tocarla.
+      observador = new ResizeObserver(() => mapa.resize())
+      observador.observe(lienzo)
       mapaRef.current = mapa
       setElementos(nuevos)
     })
     return () => {
       cancelado = true
+      observador?.disconnect()
       for (const m of marcadores) m.remove()
       mapaRef.current?.remove()
       mapaRef.current = null
@@ -229,18 +275,35 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
 
   // Los marcadores son DOM propio, así que sobreviven al cambio de estilo.
   React.useEffect(() => {
-    const url = urlEstilo(estilo, oscuro)
-    if (!mapaRef.current || url === urlRef.current) return
-    urlRef.current = url
-    mapaRef.current.setStyle(url)
-  }, [estilo, oscuro, elementos])
+    const siguiente = estiloMapa(estilo, oscuro, vintage)
+    if (!mapaRef.current || siguiente.clave === claveEstiloRef.current) return
+    claveEstiloRef.current = siguiente.clave
+    mapaRef.current.setStyle(siguiente.estilo)
+  }, [estilo, oscuro, vintage, elementos])
 
-  // La ciudad activa se dibuja por encima de las demás (su ficha incluida).
+  const { viento, error: errorViento } = useVientoActual(verViento)
+  useCapaViento(
+    mapaRef,
+    elementos !== null,
+    verViento ? viento : null,
+    vintage
+      ? oscuro
+        ? "rgba(240, 225, 190, 0.5)"
+        : "rgba(70, 45, 20, 0.45)"
+      : oscuro || estilo === "satelite"
+        ? "rgba(255, 255, 255, 0.55)"
+        : "rgba(30, 41, 59, 0.4)"
+  )
+
+  useCriaturasVintage(mapaRef, elementos !== null, vintage)
+
+  // La ciudad activa se dibuja por encima de las demás (su ficha incluida), y
+  // todas por encima de las criaturas del mapa vintage (z-index 0).
   React.useEffect(() => {
     if (!elementos) return
     for (const [nombre, el] of Object.entries(elementos)) {
       el.style.zIndex =
-        nombre === activa ? "2" : nombre === resaltada ? "1" : ""
+        nombre === activa ? "3" : nombre === resaltada ? "2" : "1"
     }
   }, [elementos, activa, resaltada])
 
@@ -293,12 +356,19 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   )
   const minimo = valores.length ? Math.min(...valores) : 0
   const maximo = valores.length ? Math.max(...valores) : 0
-  const rampa = oscuro ? RAMPA_OSCURA : RAMPA
+  const rampa = vintage
+    ? oscuro
+      ? RAMPA_VINTAGE_OSCURA
+      : RAMPA_VINTAGE
+    : oscuro
+      ? RAMPA_OSCURA
+      : RAMPA
   const colorDe = (v: number) =>
     interpolar(rampa, maximo > minimo ? (v - minimo) / (maximo - minimo) : 0.5)
   const { unidad } = METRICAS[metrica]
 
   const incluida = (nombre: string) => config.ciudades.includes(nombre)
+  const todasIncluidas = NOMBRES_CIUDADES.every(incluida)
   const alternarCiudad = (nombre: string, marcar: boolean) =>
     setConfig((c) => ({
       ...c,
@@ -334,13 +404,24 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
     <section
       ref={marcoRef}
       aria-labelledby="titulo-mapa"
-      className="relative isolate h-[calc(100svh-6.5rem)] min-h-[34rem] overflow-hidden bg-muted lg:h-svh"
+      className="@container relative isolate h-full overflow-hidden bg-muted"
     >
       {/* maplibre-gl.css fuerza `position: relative` en el lienzo (y gana a las
           capas de Tailwind), así que la posición absoluta va en un envoltorio. */}
       <div className="absolute inset-0">
         <div ref={lienzoRef} className="size-full" />
       </div>
+
+      {vintage && (
+        <>
+          <MarcoVintage />
+          <RosaVientos
+            mapaRef={mapaRef}
+            mapaListo={elementos !== null}
+            className="absolute right-12 bottom-14 z-10 hidden size-28 @xl:block"
+          />
+        </>
+      )}
 
       {estadoMapa !== "listo" && (
         <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
@@ -362,33 +443,96 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
       )}
 
       {/* Capa de paneles: deja pasar el ratón al mapa salvo en los propios paneles. */}
-      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between gap-3 p-3 sm:p-4">
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 z-20 flex flex-col justify-between gap-3 p-3 @xl:p-4",
+          // Con el marco vintage, los paneles quedan dentro del filete interior.
+          vintage && "p-9 @xl:p-10"
+        )}
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className={cn(FLOTANTE, "flex max-w-sm flex-col gap-3 p-4")}>
-            <div>
-              <h2 id="titulo-mapa" className="text-lg font-semibold">
-                Mapa meteorológico
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {config.ciudades.length} de {CIUDADES.length} ciudades ·{" "}
-                {config.fechaInicio} → {config.fechaFin}
+          {/* Columna izquierda: título y, debajo, la lista de ciudades. */}
+          <div className="flex w-full max-w-64 flex-col gap-3">
+            <div className={cn(FLOTANTE, "flex flex-col gap-3 p-4")}>
+              <div>
+                <h2 id="titulo-mapa" className="text-lg font-semibold">
+                  Mapa meteorológico
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {config.ciudades.length} de {CIUDADES.length} ciudades ·{" "}
+                  {config.fechaInicio} → {config.fechaFin}
+                </p>
+              </div>
+              <p className="hidden text-xs text-muted-foreground @xl:block">
+                Pulsa una ciudad para ver su ficha.
               </p>
+              <Button
+                onClick={() => void etl.extraer()}
+                disabled={ocupado || validacion.errores.length > 0}
+              >
+                {extraccion?.enCurso ? (
+                  <Loader2Icon className="animate-spin" aria-hidden />
+                ) : (
+                  <DownloadCloudIcon aria-hidden />
+                )}
+                Extraer datos
+              </Button>
             </div>
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              Pulsa una ciudad para ver su ficha. Marca o desmarca ciudades
-              abajo para decidir qué se extrae.
-            </p>
-            <Button
-              onClick={() => void etl.extraer()}
-              disabled={ocupado || validacion.errores.length > 0}
+
+            <section
+              aria-labelledby="titulo-ciudades"
+              className={cn(FLOTANTE, "flex flex-col gap-0.5 p-1.5")}
             >
-              {extraccion?.enCurso ? (
-                <Loader2Icon className="animate-spin" aria-hidden />
-              ) : (
-                <DownloadCloudIcon aria-hidden />
-              )}
-              Extraer datos
-            </Button>
+              <div className="flex items-center justify-between gap-2 py-0.5 pl-2">
+                <h3 id="titulo-ciudades" className="text-xs font-semibold">
+                  Ciudades{" "}
+                  <span className="font-normal text-muted-foreground tabular-nums">
+                    {config.ciudades.length}/{CIUDADES.length}
+                  </span>
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={ocupado}
+                  title={
+                    todasIncluidas
+                      ? "Desmarcar todas las ciudades"
+                      : "Marcar todas las ciudades"
+                  }
+                  onClick={() =>
+                    setConfig((c) => ({
+                      ...c,
+                      ciudades: todasIncluidas ? [] : [...NOMBRES_CIUDADES],
+                    }))
+                  }
+                >
+                  {todasIncluidas ? "Ninguna" : "Todas"}
+                </Button>
+              </div>
+              <ul className="flex flex-col gap-0.5">
+                {CIUDADES.map((c) => (
+                  <li key={c.nombre}>
+                    <FilaCiudad
+                      ciudad={c}
+                      valor={valorDe(c.nombre)}
+                      unidad={unidad}
+                      color={colorDe}
+                      incluida={incluida(c.nombre)}
+                      estado={
+                        extraccion?.descargas.find((d) => d.ciudad === c.nombre)
+                          ?.estado
+                      }
+                      activa={activa === c.nombre || resaltada === c.nombre}
+                      ocupado={ocupado}
+                      alternar={(m) => alternarCiudad(c.nombre, m)}
+                      enfocar={() => enfocar(c)}
+                      alEntrar={() => setResaltada(c.nombre)}
+                      alSalir={() => setResaltada(null)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
 
           <div className={cn(FLOTANTE, "flex flex-col gap-3 p-3")}>
@@ -401,18 +545,6 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
               valor={metrica}
               alCambiar={setMetrica}
             />
-            {CLAVE_MAPTILER && (
-              <Segmentado
-                className="hidden sm:flex"
-                etiqueta="Mapa base"
-                opciones={(Object.keys(ESTILOS) as Estilo[]).map((e) => ({
-                  valor: e,
-                  titulo: ESTILOS[e].titulo,
-                }))}
-                valor={estilo}
-                alCambiar={setEstilo}
-              />
-            )}
             {datos && valores.length > 0 ? (
               <Leyenda
                 titulo={METRICAS[metrica].titulo}
@@ -426,7 +558,78 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
                 Extrae datos para colorear las ciudades según la métrica.
               </p>
             )}
-            <div className="hidden gap-1 sm:flex">
+
+            {/* Opciones visuales plegadas: no hacen falta para la práctica. */}
+            <button
+              type="button"
+              aria-expanded={capasAbiertas}
+              aria-controls={idCapas}
+              onClick={() => setCapasAbiertas((a) => !a)}
+              className="flex items-center gap-2 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <LayersIcon aria-hidden className="size-3.5" />
+              Capas y aspecto
+              <ChevronDownIcon
+                aria-hidden
+                className={cn(
+                  "ml-auto size-3.5 transition-transform",
+                  capasAbiertas && "rotate-180"
+                )}
+              />
+            </button>
+            {capasAbiertas && (
+              <div id={idCapas} className="flex flex-col gap-3 border-t pt-3">
+                {CLAVE_MAPTILER && !vintage && (
+                  <Segmentado
+                    className="hidden @xl:flex"
+                    etiqueta="Mapa base"
+                    opciones={(Object.keys(ESTILOS) as Estilo[]).map((e) => ({
+                      valor: e,
+                      titulo: ESTILOS[e].titulo,
+                    }))}
+                    valor={estilo}
+                    alCambiar={setEstilo}
+                  />
+                )}
+                <Segmentado
+                  etiqueta="Filtro (toda la página)"
+                  opciones={(Object.keys(FILTROS) as Filtro[]).map((f) => ({
+                    valor: f,
+                    titulo: FILTROS[f].titulo,
+                  }))}
+                  valor={filtro}
+                  alCambiar={setFiltro}
+                />
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={verViento && !errorViento}
+                  disabled={errorViento}
+                  onClick={() => setVerViento((v) => !v)}
+                  title="Recurso visual: viento de ahora mismo según Open-Meteo. No forma parte de la extracción."
+                  className="flex items-center gap-2 rounded-md text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                >
+                  <WindIcon aria-hidden className="size-3.5" />
+                  {errorViento ? "Viento no disponible" : "Viento ahora"}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "ml-auto flex h-4 w-7 items-center rounded-full p-0.5 transition-colors",
+                      verViento && !errorViento ? "bg-marca" : "bg-muted"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "size-3 rounded-full bg-card shadow-sm transition-transform",
+                        verViento && !errorViento && "translate-x-3"
+                      )}
+                    />
+                  </span>
+                </button>
+              </div>
+            )}
+
+            <div className="hidden gap-1 @xl:flex">
               <Button
                 variant="outline"
                 size="icon-sm"
@@ -466,54 +669,6 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
               </Button>
             </div>
           </div>
-        </div>
-
-        <div
-          className={cn(
-            FLOTANTE,
-            // Deja libre la esquina inferior derecha para la atribución del mapa.
-            "flex max-w-[calc(100%-2.25rem)] gap-2 self-start overflow-x-auto p-2"
-          )}
-        >
-          <div className="flex shrink-0 flex-col justify-center gap-1">
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={ocupado}
-              onClick={() =>
-                setConfig((c) => ({ ...c, ciudades: [...NOMBRES_CIUDADES] }))
-              }
-            >
-              Todas
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={ocupado}
-              onClick={() => setConfig((c) => ({ ...c, ciudades: [] }))}
-            >
-              Ninguna
-            </Button>
-          </div>
-          {CIUDADES.map((c) => (
-            <TarjetaCiudad
-              key={c.nombre}
-              ciudad={c}
-              valor={valorDe(c.nombre)}
-              unidad={unidad}
-              color={colorDe}
-              incluida={incluida(c.nombre)}
-              estado={
-                extraccion?.descargas.find((d) => d.ciudad === c.nombre)?.estado
-              }
-              activa={activa === c.nombre || resaltada === c.nombre}
-              ocupado={ocupado}
-              alternar={(m) => alternarCiudad(c.nombre, m)}
-              enfocar={() => enfocar(c)}
-              alEntrar={() => setResaltada(c.nombre)}
-              alSalir={() => setResaltada(null)}
-            />
-          ))}
         </div>
       </div>
 
@@ -593,7 +748,12 @@ function Segmentado<T extends string>({
   )
 }
 
-function TarjetaCiudad({
+/**
+ * Fila de la lista: casilla para incluirla en la extracción y, al pulsar el
+ * nombre, vuela a la ciudad. Mientras se descarga, el punto pasa a ser el
+ * icono de estado.
+ */
+function FilaCiudad({
   ciudad,
   valor,
   unidad,
@@ -626,59 +786,49 @@ function TarjetaCiudad({
       onMouseEnter={alEntrar}
       onMouseLeave={alSalir}
       className={cn(
-        "flex w-40 shrink-0 flex-col gap-1.5 rounded-xl p-2.5 transition-colors",
+        "flex items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] transition-colors",
         activa ? "bg-muted ring-1 ring-foreground/20" : "hover:bg-muted/60"
       )}
     >
-      <div className="flex items-center gap-2">
-        <Checkbox
-          aria-label={`Incluir ${ciudad.nombre} en la extracción`}
-          checked={incluida}
-          onCheckedChange={alternar}
-          disabled={ocupado}
-        />
-        <button
-          type="button"
-          onClick={enfocar}
+      <Checkbox
+        aria-label={`Incluir ${ciudad.nombre} en la extracción`}
+        checked={incluida}
+        onCheckedChange={alternar}
+        disabled={ocupado}
+      />
+      <button
+        type="button"
+        onClick={enfocar}
+        title={`Ver ${ciudad.nombre} en el mapa`}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        {icono ? (
+          <icono.icono
+            aria-label={icono.texto}
+            className={cn("size-3.5 shrink-0", icono.clase)}
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="size-2 shrink-0 rounded-full ring-1 ring-foreground/25"
+            style={{
+              background:
+                incluida && valor !== null ? color(valor) : "transparent",
+            }}
+          />
+        )}
+        <span
           className={cn(
-            "min-w-0 flex-1 truncate rounded text-left text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+            "flex-1 truncate font-medium",
             !incluida && "text-muted-foreground"
           )}
         >
           {ciudad.nombre}
-        </button>
-        {icono && (
-          <icono.icono
-            aria-label={icono.texto}
-            className={cn("size-4 shrink-0", icono.clase)}
-          />
-        )}
-      </div>
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={enfocar}
-        className="flex items-center gap-2 text-left text-xs text-muted-foreground"
-      >
-        <span
-          aria-hidden
-          className="size-2.5 shrink-0 rounded-full ring-1 ring-foreground/20"
-          style={{
-            background: !incluida
-              ? "transparent"
-              : valor !== null
-                ? color(valor)
-                : "var(--color-primary)",
-          }}
-        />
-        {valor !== null ? (
-          <span className="text-foreground tabular-nums">
+        </span>
+        {valor !== null && (
+          <span className="text-xs text-muted-foreground tabular-nums">
             {formatoMedida(valor, unidad)}
           </span>
-        ) : incluida ? (
-          "Sin datos"
-        ) : (
-          "No incluida"
         )}
       </button>
     </div>

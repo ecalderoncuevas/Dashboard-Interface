@@ -71,7 +71,7 @@ export function GraficoCiudades({ etl }: { etl: PipelineEtl }) {
   return (
     <section
       aria-labelledby="titulo-grafico"
-      className="flex flex-col gap-4 rounded-3xl neu p-4 sm:p-6"
+      className="flex flex-col gap-4 rounded-3xl neu p-4 @xl:p-6"
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -255,7 +255,7 @@ function Barras({
 
   return (
     <EjeY marcas={escala.marcas} pct={pct}>
-      <div aria-hidden className="grafico-animado relative flex gap-1 sm:gap-2">
+      <div aria-hidden className="grafico-animado relative flex gap-1 @xl:gap-2">
         {ciudades.map((c, i) => {
           const y = pct(c.valor)
           const esActiva = activa === c.ciudad
@@ -699,7 +699,7 @@ function Quesos({
   const destacado = activo !== null ? porciones[activo] : null
 
   return (
-    <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+    <div className="flex flex-col items-center gap-6 @xl:flex-row @xl:items-center">
       {/* La clave reinicia la animación al cambiar de métrica o de ciudad. */}
       <div
         key={`${metrica}-${ciudad}`}

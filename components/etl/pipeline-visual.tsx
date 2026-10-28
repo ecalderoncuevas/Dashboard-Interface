@@ -16,6 +16,7 @@ import { calcularVolumen } from "@/lib/etl/extraccion"
 import type { EstadoFase } from "@/lib/etl/tipos"
 import { cn } from "@/lib/utils"
 
+import { useResumido } from "./detalle-panel"
 import { EncabezadoPaso } from "./encabezado-paso"
 import { EstadoBadge } from "./estado-badge"
 import { formatoDuracion, formatoEntero } from "./formato"
@@ -198,7 +199,33 @@ export function calcularFases(etl: PipelineEtl): Fase[] {
   ]
 }
 
-const ICONOS_FASE: Record<string, LucideIcon> = {
+/** Qué tiene que hacer el estudiante a continuación, según la fase actual. */
+export function siguientePaso(fase: Fase | undefined): string {
+  if (!fase)
+    return "Pipeline completo. Consulta los datos guardados en Supabase."
+  const pasos: Record<string, Partial<Record<EstadoFase, string>>> = {
+    extraccion: {
+      pendiente: "Elige ciudades y fechas y pulsa «Extraer datos».",
+      en_curso: "Descargando los datos de Open-Meteo…",
+      error: "Alguna ciudad ha fallado: reinténtala desde la extracción.",
+    },
+    transformacion: {
+      error: "Hay arrays incoherentes: revisa los registros transformados.",
+    },
+    filtrado: {
+      en_curso: "Selecciona los registros que quieres cargar.",
+      error: "Hay filtros no válidos: corrígelos.",
+    },
+    carga: {
+      pendiente: "Revisa la vista previa y carga los datos en Supabase.",
+      en_curso: "Subiendo lotes a Supabase…",
+      error: "Hay lotes con errores o claves sin verificar: reinténtalos.",
+    },
+  }
+  return pasos[fase.id]?.[fase.estado] ?? `Revisa la fase de ${fase.titulo}.`
+}
+
+export const ICONOS_FASE: Record<string, LucideIcon> = {
   extraccion: CloudDownloadIcon,
   transformacion: ShuffleIcon,
   limpieza: SparklesIcon,
@@ -213,6 +240,7 @@ export function PipelineVisual({
   etl: PipelineEtl
   alInspeccionar: (pestana: Pestana) => void
 }) {
+  const resumido = useResumido()
   const fases = calcularFases(etl)
   const completadas = fases.filter((f) => f.estado === "completada").length
 
@@ -222,146 +250,160 @@ export function PipelineVisual({
         numero={2}
         id="titulo-pipeline"
         titulo="Pipeline"
-        descripcion="Lo que le pasa a los datos en cada fase. Pulsa una fase o una barra del embudo para inspeccionar sus registros."
+        descripcion={
+          resumido
+            ? "Lo que le pasa a los datos en cada fase. Pulsa una fase para inspeccionar sus registros."
+            : "Lo que le pasa a los datos en cada fase. Pulsa una fase o una barra del embudo para inspeccionar sus registros."
+        }
       >
         <span className="rounded-full neu-sm px-3 py-1 text-xs tabular-nums">
           {completadas} de {fases.length} fases completadas
         </span>
       </EncabezadoPaso>
 
-      <div className="flex flex-col gap-8 rounded-3xl neu p-5 sm:p-6">
-        <Recorrido fases={fases} alInspeccionar={alInspeccionar} />
-        <Embudo etl={etl} alInspeccionar={alInspeccionar} />
-      </div>
-
-      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {fases.map((f, i) => {
-          const Icono = ICONOS_FASE[f.id]
-          return (
-            <li key={f.id} className="flex">
-              <button
-                type="button"
-                onClick={() => alInspeccionar(f.pestana)}
-                className={cn(
-                  "group flex flex-1 flex-col gap-3 rounded-3xl neu p-4 text-left text-sm transition-all outline-none hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/50",
-                  f.estado === "error" && "ring-2 ring-red-600/40",
-                  f.estado === "en_curso" && "ring-2 ring-marca/50"
-                )}
-                aria-label={`Fase ${i + 1}: ${f.titulo}. Inspeccionar resultados`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex size-9 items-center justify-center rounded-xl neu-hundido">
-                    <Icono aria-hidden className="size-4 text-marca" />
-                  </span>
-                  <EstadoBadge estado={f.estado} texto={f.textoEstado} />
-                </div>
-                <span className="font-medium">
-                  <span className="text-muted-foreground">{i + 1}.</span>{" "}
-                  {f.titulo}
-                </span>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {f.explicacion}
-                </p>
-                <dl className="mt-auto flex flex-col gap-1 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <dt className="sr-only">Entrada</dt>
-                    <dd className="text-muted-foreground tabular-nums">
-                      {f.entrada}
-                    </dd>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <ArrowRightIcon
-                      aria-hidden
-                      className="size-3 shrink-0 text-marca"
-                    />
-                    <dt className="sr-only">Salida</dt>
-                    <dd className="font-medium tabular-nums">{f.salida}</dd>
-                  </div>
-                  {f.extra && (
-                    <div>
-                      <dt className="sr-only">Detalle</dt>
-                      <dd className="text-muted-foreground tabular-nums">
-                        {f.extra}
-                      </dd>
-                    </div>
-                  )}
-                  <div className="flex gap-1.5">
-                    <dt className="text-muted-foreground">Duración</dt>
-                    <dd className="tabular-nums">
-                      {formatoDuracion(f.duracionMs)}
-                    </dd>
-                  </div>
-                </dl>
-                <span className="flex items-center gap-1 text-xs font-medium text-marca">
-                  Inspeccionar
-                  <ArrowRightIcon
-                    aria-hidden
-                    className="size-3 transition-transform group-hover:translate-x-0.5"
-                  />
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ol>
+      {resumido ? (
+        <FilasFases fases={fases} alInspeccionar={alInspeccionar} />
+      ) : (
+        <>
+          <div className="rounded-3xl neu p-5 @xl:p-6">
+            <Embudo etl={etl} alInspeccionar={alInspeccionar} />
+          </div>
+          <TarjetasFases fases={fases} alInspeccionar={alInspeccionar} />
+        </>
+      )}
     </section>
   )
 }
 
-/** Nodos de las fases unidos por una pista que se va llenando. */
-function Recorrido({
+/** Versión compacta: una fila por fase con lo que pide la práctica y nada más. */
+function FilasFases({
   fases,
   alInspeccionar,
 }: {
   fases: Fase[]
   alInspeccionar: (pestana: Pestana) => void
 }) {
-  // La pista se llena hasta la última fase completada seguida.
-  const primeraNoCompletada = fases.findIndex((f) => f.estado !== "completada")
-  const llenas = primeraNoCompletada === -1 ? fases.length : primeraNoCompletada
-  const relleno = Math.max(0, (llenas - 1) / (fases.length - 1)) * 100
-
   return (
-    <div className="relative px-4 sm:px-8">
-      <div
-        aria-hidden
-        className="absolute inset-x-8 top-6 h-2 rounded-full neu-hundido sm:inset-x-14"
-      >
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-700"
-          style={{ width: `${relleno}%` }}
-        />
-      </div>
-      <ol className="relative flex justify-between">
-        {fases.map((f, i) => {
-          const Icono = ICONOS_FASE[f.id]
-          return (
-            <li key={f.id} className="flex w-16 flex-col items-center gap-2">
-              <button
-                type="button"
-                onClick={() => alInspeccionar(f.pestana)}
-                aria-label={`${f.titulo}: ${f.textoEstado ?? f.estado}`}
-                className={cn(
-                  "flex size-12 items-center justify-center rounded-full transition-all outline-none hover:scale-105 focus-visible:ring-3 focus-visible:ring-ring/50",
-                  f.estado === "completada" &&
-                    "bg-primary text-primary-foreground shadow-md",
-                  f.estado === "en_curso" &&
-                    "animate-pulse neu-sm text-marca ring-2 ring-marca",
-                  f.estado === "error" && "bg-destructive text-white shadow-md",
-                  f.estado === "pendiente" && "neu-sm text-muted-foreground"
-                )}
-              >
-                <Icono aria-hidden className="size-5" />
-              </button>
-              <span className="text-center text-xs leading-tight">
-                <span className="hidden sm:inline">{f.titulo}</span>
-                <span className="sm:hidden">{i + 1}</span>
+    <ol className="flex flex-col divide-y overflow-hidden rounded-2xl neu">
+      {fases.map((f, i) => {
+        const Icono = ICONOS_FASE[f.id]
+        return (
+          <li key={f.id}>
+            <button
+              type="button"
+              onClick={() => alInspeccionar(f.pestana)}
+              aria-label={`Fase ${i + 1}: ${f.titulo}. Inspeccionar resultados`}
+              className={cn(
+                "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 text-left text-sm transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                f.estado === "error" && "bg-red-500/5",
+                f.estado === "en_curso" && "bg-marca/5"
+              )}
+            >
+              <Icono aria-hidden className="size-4 text-marca" />
+              <span className="truncate font-medium">
+                <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                {f.titulo}
               </span>
-            </li>
-          )
-        })}
-      </ol>
-    </div>
+              <EstadoBadge estado={f.estado} texto={f.textoEstado} />
+              <span className="col-span-2 col-start-2 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground tabular-nums">
+                <span className="sr-only">Entrada:</span>
+                {f.entrada}
+                <ArrowRightIcon aria-hidden className="size-3 text-marca" />
+                <span className="sr-only">Salida:</span>
+                <span className="font-medium text-foreground">{f.salida}</span>
+                {f.extra && <span>· {f.extra}</span>}
+                <span>· {formatoDuracion(f.duracionMs)}</span>
+              </span>
+              <span className="col-span-2 col-start-2 text-xs text-muted-foreground">
+                {f.explicacion}
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/** Versión completa: una tarjeta por fase. */
+function TarjetasFases({
+  fases,
+  alInspeccionar,
+}: {
+  fases: Fase[]
+  alInspeccionar: (pestana: Pestana) => void
+}) {
+  return (
+    <ol className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-5">
+      {fases.map((f, i) => {
+        const Icono = ICONOS_FASE[f.id]
+        return (
+          <li key={f.id} className="flex">
+            <button
+              type="button"
+              onClick={() => alInspeccionar(f.pestana)}
+              className={cn(
+                "group flex flex-1 flex-col gap-3 rounded-3xl neu p-4 text-left text-sm transition-all outline-none hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-ring/50",
+                f.estado === "error" && "ring-2 ring-red-600/40",
+                f.estado === "en_curso" && "ring-2 ring-marca/50"
+              )}
+              aria-label={`Fase ${i + 1}: ${f.titulo}. Inspeccionar resultados`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex size-9 items-center justify-center rounded-xl neu-hundido">
+                  <Icono aria-hidden className="size-4 text-marca" />
+                </span>
+                <EstadoBadge estado={f.estado} texto={f.textoEstado} />
+              </div>
+              <span className="font-medium">
+                <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                {f.titulo}
+              </span>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {f.explicacion}
+              </p>
+              <dl className="mt-auto flex flex-col gap-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <dt className="sr-only">Entrada</dt>
+                  <dd className="text-muted-foreground tabular-nums">
+                    {f.entrada}
+                  </dd>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <ArrowRightIcon
+                    aria-hidden
+                    className="size-3 shrink-0 text-marca"
+                  />
+                  <dt className="sr-only">Salida</dt>
+                  <dd className="font-medium tabular-nums">{f.salida}</dd>
+                </div>
+                {f.extra && (
+                  <div>
+                    <dt className="sr-only">Detalle</dt>
+                    <dd className="text-muted-foreground tabular-nums">
+                      {f.extra}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex gap-1.5">
+                  <dt className="text-muted-foreground">Duración</dt>
+                  <dd className="tabular-nums">
+                    {formatoDuracion(f.duracionMs)}
+                  </dd>
+                </div>
+              </dl>
+              <span className="flex items-center gap-1 text-xs font-medium text-marca">
+                Inspeccionar
+                <ArrowRightIcon
+                  aria-hidden
+                  className="size-3 transition-transform group-hover:translate-x-0.5"
+                />
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
@@ -440,7 +482,7 @@ function Embudo({
               <button
                 type="button"
                 onClick={() => alInspeccionar(f.pestana)}
-                className="group grid w-full grid-cols-[8rem_1fr] items-center gap-3 rounded-xl p-1 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:grid-cols-[11rem_1fr_9rem]"
+                className="group grid w-full grid-cols-[8rem_1fr] items-center gap-3 rounded-xl p-1 text-left text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @xl:grid-cols-[11rem_1fr_9rem]"
               >
                 <span className="text-muted-foreground group-hover:text-foreground">
                   {f.titulo}
@@ -464,7 +506,7 @@ function Embudo({
                 </span>
                 <span
                   className={cn(
-                    "col-start-2 text-muted-foreground tabular-nums sm:col-start-3",
+                    "col-start-2 text-muted-foreground tabular-nums @xl:col-start-3",
                     perdidas > 0 && "text-red-700 dark:text-red-300"
                   )}
                 >

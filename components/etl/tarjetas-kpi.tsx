@@ -3,12 +3,14 @@
 import {
   CheckCircle2Icon,
   CloudDownloadIcon,
+  FilterIcon,
   UploadCloudIcon,
   XCircleIcon,
 } from "lucide-react"
 
 import type { PipelineEtl } from "@/hooks/use-pipeline-etl"
 
+import { useResumido } from "./detalle-panel"
 import { formatoEntero, formatoPorcentaje } from "./formato"
 
 interface Kpi {
@@ -19,7 +21,9 @@ interface Kpi {
   porcentaje?: string
 }
 
+/** Los cinco contadores que la práctica pide distinguir siempre. */
 export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
+  const resumido = useResumido()
   const { procesado, filtradosOrdenados, conjuntoCarga, extraccion } = etl
   const total = procesado?.transformacion.registros.length ?? 0
   const validos = procesado?.limpieza.validos.length ?? 0
@@ -28,7 +32,7 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
 
   const kpis: Kpi[] = [
     {
-      titulo: "Registros extraídos",
+      titulo: "Total extraído",
       valor: procesado ? total : null,
       ayuda: procesado
         ? `Una fila por ciudad y hora · ${ciudades} ciudades`
@@ -50,25 +54,67 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
       porcentaje: procesado ? formatoPorcentaje(rechazados, total) : undefined,
     },
     {
-      titulo: "Listos para cargar",
+      titulo: "Coinciden con los filtros",
+      valor: procesado ? filtradosOrdenados.length : null,
+      ayuda: "Válidos que cumplen los filtros actuales",
+      icono: FilterIcon,
+    },
+    {
+      titulo: "Seleccionados para cargar",
       valor: procesado ? conjuntoCarga.registros.length : null,
-      ayuda: procesado
-        ? `${formatoEntero(filtradosOrdenados.length)} coinciden con los filtros`
-        : "Seleccionados y dentro de los filtros",
+      ayuda: "Seleccionados y dentro de los filtros",
       icono: UploadCloudIcon,
     },
   ]
+
+  const aviso = conjuntoCarga.seleccionadosFueraDeFiltro > 0 && (
+    <p className="text-sm text-amber-800 dark:text-amber-300" role="status">
+      ⚠ {formatoEntero(conjuntoCarga.seleccionadosFueraDeFiltro)} fila(s)
+      seleccionada(s) quedan fuera de los filtros actuales y no se subirán.
+    </p>
+  )
+
+  if (resumido) {
+    return (
+      <section aria-label="Contadores" className="flex flex-col gap-2">
+        <dl className="grid grid-cols-2 gap-1 rounded-2xl neu p-2 @md:grid-cols-3 @3xl:grid-cols-5">
+          {kpis.map(({ titulo, valor, ayuda, porcentaje }) => (
+            <div
+              key={titulo}
+              title={ayuda}
+              className="flex flex-col gap-0.5 rounded-xl px-3 py-2"
+            >
+              <dt className="order-2 text-xs leading-tight text-muted-foreground">
+                {titulo}
+              </dt>
+              <dd className="order-1 flex items-baseline gap-1.5">
+                <span className="text-xl font-semibold tracking-tight tabular-nums">
+                  {valor === null ? "—" : formatoEntero(valor)}
+                </span>
+                {porcentaje && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {porcentaje}
+                  </span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {aviso}
+      </section>
+    )
+  }
 
   return (
     <section
       aria-label="Indicadores principales"
       className="flex flex-col gap-2"
     >
-      <dl className="grid grid-cols-2 gap-4 xl:grid-cols-4 xl:gap-6">
+      <dl className="grid grid-cols-2 gap-4 @3xl:grid-cols-3 @5xl:grid-cols-5 @5xl:gap-6">
         {kpis.map(({ titulo, valor, ayuda, icono: Icono, porcentaje }) => (
           <div
             key={titulo}
-            className="flex flex-col gap-3 rounded-3xl neu p-4 sm:p-5"
+            className="flex flex-col gap-3 rounded-3xl neu p-4 @xl:p-5"
           >
             <span
               aria-hidden
@@ -81,7 +127,7 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
                 {titulo}
               </dt>
               <dd className="order-1 flex items-baseline gap-2">
-                <span className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
+                <span className="text-2xl font-semibold tracking-tight tabular-nums @xl:text-3xl">
                   {valor === null ? "—" : formatoEntero(valor)}
                 </span>
                 {porcentaje && (
@@ -95,12 +141,7 @@ export function TarjetasKpi({ etl }: { etl: PipelineEtl }) {
           </div>
         ))}
       </dl>
-      {conjuntoCarga.seleccionadosFueraDeFiltro > 0 && (
-        <p className="text-sm text-amber-800 dark:text-amber-300" role="status">
-          ⚠ {formatoEntero(conjuntoCarga.seleccionadosFueraDeFiltro)} fila(s)
-          seleccionada(s) quedan fuera de los filtros actuales y no se subirán.
-        </p>
-      )}
+      {aviso}
     </section>
   )
 }

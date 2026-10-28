@@ -89,7 +89,7 @@ export function TarjetaCalidad({
   return (
     <section
       aria-labelledby="titulo-calidad"
-      className="flex flex-col gap-4 rounded-3xl neu p-4 sm:p-5"
+      className="flex flex-col gap-4 rounded-3xl neu p-4 @xl:p-5"
     >
       <header className="flex items-start justify-between gap-3">
         <div>

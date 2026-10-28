@@ -126,7 +126,7 @@ export function PestanaSupabase({ etl }: { etl: PipelineEtl }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 @xl:grid-cols-2">
         <div className="flex gap-3 rounded-lg border border-dashed p-3 text-sm">
           <HardDriveIcon
             className="mt-0.5 size-5 shrink-0 text-muted-foreground"
