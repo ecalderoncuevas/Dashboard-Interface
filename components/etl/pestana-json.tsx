@@ -51,7 +51,12 @@ export function PestanaJson({ etl }: { etl: PipelineEtl }) {
   const correctas = descargas.filter((d) => d.json)
 
   if (!etl.extraccion) {
-    return <SinDatos>Extrae datos para ver las respuestas originales.</SinDatos>
+    return (
+      <SinDatos>
+        Pulsa «Descargar los datos» (pestaña Extracción) para ver aquí las
+        respuestas originales.
+      </SinDatos>
+    )
   }
 
   const periodo = `${etl.extraccion.config.fechaInicio}_${etl.extraccion.config.fechaFin}`

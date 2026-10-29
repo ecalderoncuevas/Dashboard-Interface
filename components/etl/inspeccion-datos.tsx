@@ -28,9 +28,31 @@ export type Pestana =
   "json" | "transformados" | "validos" | "rechazados" | "carga" | "supabase"
 
 /**
- * Los datos de cada fase como un acordeón: una sección abierta a la vez, en el
- * orden del pipeline, para no ver todas las tablas de golpe. Solo se monta la
- * sección abierta.
+ * Lleva `el` al principio de su contenedor con scroll más cercano (el panel).
+ * No se usa scrollIntoView porque desplaza también los ancestros con
+ * `overflow: hidden` (la página entera): subía la aplicación, dejaba un hueco
+ * abajo y no se podía volver con la rueda.
+ */
+function desplazarDentro(el: HTMLElement) {
+  let contenedor = el.parentElement
+  while (
+    contenedor &&
+    !/(auto|scroll)/.test(getComputedStyle(contenedor).overflowY)
+  ) {
+    contenedor = contenedor.parentElement
+  }
+  if (!contenedor) return
+  const distancia =
+    el.getBoundingClientRect().top - contenedor.getBoundingClientRect().top - 8
+  contenedor.scrollBy({ top: distancia, behavior: "smooth" })
+}
+
+/**
+ * Los datos de cada fase como un acordeón en el orden del pipeline. Se pueden
+ * abrir varias secciones a la vez; solo se montan las abiertas.
+ *
+ * `pestana` es la última sección pedida (desde la cabecera o desde el riel del
+ * pipeline): siempre está abierta y es la que se resalta arriba.
  */
 export function InspeccionDatos({
   etl,
@@ -99,16 +121,33 @@ export function InspeccionDatos({
     },
   ]
 
+  // Secciones abiertas a mano, además de `pestana`.
+  const [abiertas, setAbiertas] = React.useState<ReadonlySet<Pestana>>(
+    () => new Set()
+  )
+  const estaAbierta = (v: Pestana) => pestana === v || abiertas.has(v)
+  const alternar = (v: Pestana) => {
+    if (estaAbierta(v)) {
+      setAbiertas((a) => {
+        const nuevo = new Set(a)
+        nuevo.delete(v)
+        return nuevo
+      })
+      if (pestana === v) setPestana(null)
+    } else {
+      setAbiertas((a) => new Set(a).add(v))
+      setPestana(v)
+    }
+  }
+
   // Al abrir una sección (también desde el riel del pipeline) se lleva su cabecera arriba.
   const elementosRef = React.useRef<Partial<Record<Pestana, HTMLElement>>>({})
   React.useEffect(() => {
     if (!pestana) return
-    const id = requestAnimationFrame(() =>
-      elementosRef.current[pestana]?.scrollIntoView({
-        block: "start",
-        behavior: "smooth",
-      })
-    )
+    const id = requestAnimationFrame(() => {
+      const el = elementosRef.current[pestana]
+      if (el) desplazarDentro(el)
+    })
     return () => cancelAnimationFrame(id)
   }, [pestana])
 
@@ -122,7 +161,7 @@ export function InspeccionDatos({
         numero={3}
         id="titulo-inspeccion"
         titulo="Datos"
-        descripcion="Abre una fase para revisar sus registros. Solo se muestra una a la vez."
+        descripcion="Abre una o varias fases para revisar y comparar sus registros."
       />
       <ol className="flex flex-col gap-2">
         {secciones.map(
@@ -130,7 +169,7 @@ export function InspeccionDatos({
             { valor, titulo, descripcion, icono: Icono, total, contenido },
             i
           ) => {
-            const abierta = pestana === valor
+            const abierta = estaAbierta(valor)
             return (
               <li
                 key={valor}
@@ -148,7 +187,7 @@ export function InspeccionDatos({
                     id={`cabecera-${valor}`}
                     aria-expanded={abierta}
                     aria-controls={`seccion-${valor}`}
-                    onClick={() => setPestana(abierta ? null : valor)}
+                    onClick={() => alternar(valor)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
                   >
                     <span

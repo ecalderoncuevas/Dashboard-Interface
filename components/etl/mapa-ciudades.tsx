@@ -6,10 +6,7 @@ import * as React from "react"
 import { createPortal } from "react-dom"
 import type { Map as MapaLibre, Marker, StyleSpecification } from "maplibre-gl"
 import {
-  CheckCircle2Icon,
   ChevronDownIcon,
-  CircleDashedIcon,
-  DownloadCloudIcon,
   LayersIcon,
   Loader2Icon,
   LocateFixedIcon,
@@ -19,15 +16,13 @@ import {
   MinusIcon,
   PlusIcon,
   WindIcon,
-  XCircleIcon,
   XIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { useFiltroVisual } from "@/components/filtro-visual"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import type { EstadoDescarga, PipelineEtl } from "@/hooks/use-pipeline-etl"
+import type { PipelineEtl } from "@/hooks/use-pipeline-etl"
 import { CIUDADES, NOMBRES_CIUDADES, type Ciudad } from "@/lib/etl/ciudades"
 import { METRICAS, resumirPorCiudad, type Metrica } from "@/lib/etl/resumen"
 import { FILTROS, type Filtro } from "@/lib/filtro-visual"
@@ -148,34 +143,12 @@ interface DatosCiudad {
   rechazados: number
 }
 
-const ICONOS_DESCARGA: Record<
-  EstadoDescarga,
-  { icono: typeof CheckCircle2Icon; texto: string; clase: string }
-> = {
-  pendiente: {
-    icono: CircleDashedIcon,
-    texto: "Pendiente",
-    clase: "text-muted-foreground",
-  },
-  descargando: {
-    icono: Loader2Icon,
-    texto: "Descargando…",
-    clase: "animate-spin text-marca",
-  },
-  ok: {
-    icono: CheckCircle2Icon,
-    texto: "Descargada",
-    clase: "text-emerald-600",
-  },
-  error: { icono: XCircleIcon, texto: "Error", clase: "text-red-600" },
-}
-
 /** Panel translúcido que flota sobre el mapa. */
 const FLOTANTE =
   "pointer-events-auto rounded-2xl bg-card/90 shadow-lg ring-1 ring-foreground/10 backdrop-blur-md"
 
 export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
-  const { config, setConfig, extraccion, procesado, validacion } = etl
+  const { config, setConfig, extraccion, procesado } = etl
   const ocupado = Boolean(extraccion?.enCurso) || Boolean(etl.carga?.enCurso)
   const oscuro = useTheme().resolvedTheme === "dark"
   const [filtro, setFiltro] = useFiltroVisual()
@@ -188,7 +161,8 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const [capasAbiertas, setCapasAbiertas] = React.useState(false)
   const idCapas = React.useId()
   const [activa, setActiva] = React.useState<string | null>(null)
-  const [resaltada, setResaltada] = React.useState<string | null>(null)
+  // Compartida con el panel de Extracción: resaltar allí agranda el marcador aquí.
+  const { ciudadResaltada: resaltada, setCiudadResaltada: setResaltada } = etl
   const [pantallaCompleta, setPantallaCompleta] = React.useState(false)
   const [estadoMapa, setEstadoMapa] = React.useState<
     "cargando" | "listo" | "error"
@@ -368,7 +342,6 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   const { unidad } = METRICAS[metrica]
 
   const incluida = (nombre: string) => config.ciudades.includes(nombre)
-  const todasIncluidas = NOMBRES_CIUDADES.every(incluida)
   const alternarCiudad = (nombre: string, marcar: boolean) =>
     setConfig((c) => ({
       ...c,
@@ -403,7 +376,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
   return (
     <section
       ref={marcoRef}
-      aria-labelledby="titulo-mapa"
+      aria-label="Mapa meteorológico"
       className="@container relative isolate h-full overflow-hidden bg-muted"
     >
       {/* maplibre-gl.css fuerza `position: relative` en el lienzo (y gana a las
@@ -450,91 +423,8 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
           vintage && "p-9 @xl:p-10"
         )}
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          {/* Columna izquierda: título y, debajo, la lista de ciudades. */}
-          <div className="flex w-full max-w-64 flex-col gap-3">
-            <div className={cn(FLOTANTE, "flex flex-col gap-3 p-4")}>
-              <div>
-                <h2 id="titulo-mapa" className="text-lg font-semibold">
-                  Mapa meteorológico
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {config.ciudades.length} de {CIUDADES.length} ciudades ·{" "}
-                  {config.fechaInicio} → {config.fechaFin}
-                </p>
-              </div>
-              <p className="hidden text-xs text-muted-foreground @xl:block">
-                Pulsa una ciudad para ver su ficha.
-              </p>
-              <Button
-                onClick={() => void etl.extraer()}
-                disabled={ocupado || validacion.errores.length > 0}
-              >
-                {extraccion?.enCurso ? (
-                  <Loader2Icon className="animate-spin" aria-hidden />
-                ) : (
-                  <DownloadCloudIcon aria-hidden />
-                )}
-                Extraer datos
-              </Button>
-            </div>
-
-            <section
-              aria-labelledby="titulo-ciudades"
-              className={cn(FLOTANTE, "flex flex-col gap-0.5 p-1.5")}
-            >
-              <div className="flex items-center justify-between gap-2 py-0.5 pl-2">
-                <h3 id="titulo-ciudades" className="text-xs font-semibold">
-                  Ciudades{" "}
-                  <span className="font-normal text-muted-foreground tabular-nums">
-                    {config.ciudades.length}/{CIUDADES.length}
-                  </span>
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={ocupado}
-                  title={
-                    todasIncluidas
-                      ? "Desmarcar todas las ciudades"
-                      : "Marcar todas las ciudades"
-                  }
-                  onClick={() =>
-                    setConfig((c) => ({
-                      ...c,
-                      ciudades: todasIncluidas ? [] : [...NOMBRES_CIUDADES],
-                    }))
-                  }
-                >
-                  {todasIncluidas ? "Ninguna" : "Todas"}
-                </Button>
-              </div>
-              <ul className="flex flex-col gap-0.5">
-                {CIUDADES.map((c) => (
-                  <li key={c.nombre}>
-                    <FilaCiudad
-                      ciudad={c}
-                      valor={valorDe(c.nombre)}
-                      unidad={unidad}
-                      color={colorDe}
-                      incluida={incluida(c.nombre)}
-                      estado={
-                        extraccion?.descargas.find((d) => d.ciudad === c.nombre)
-                          ?.estado
-                      }
-                      activa={activa === c.nombre || resaltada === c.nombre}
-                      ocupado={ocupado}
-                      alternar={(m) => alternarCiudad(c.nombre, m)}
-                      enfocar={() => enfocar(c)}
-                      alEntrar={() => setResaltada(c.nombre)}
-                      alSalir={() => setResaltada(null)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-
+        {/* Las ciudades se eligen en el panel de Extracción (y en la ficha de cada marcador). */}
+        <div className="flex flex-wrap items-start justify-end gap-3">
           <div className={cn(FLOTANTE, "flex flex-col gap-3 p-3")}>
             <Segmentado
               etiqueta="Métrica"
@@ -555,7 +445,7 @@ export function MapaCiudades({ etl }: { etl: PipelineEtl }) {
               />
             ) : (
               <p className="max-w-64 text-xs text-muted-foreground">
-                Extrae datos para colorear las ciudades según la métrica.
+                Descarga los datos para colorear las ciudades según la métrica.
               </p>
             )}
 
@@ -744,93 +634,6 @@ function Segmentado<T extends string>({
           </button>
         ))}
       </div>
-    </div>
-  )
-}
-
-/**
- * Fila de la lista: casilla para incluirla en la extracción y, al pulsar el
- * nombre, vuela a la ciudad. Mientras se descarga, el punto pasa a ser el
- * icono de estado.
- */
-function FilaCiudad({
-  ciudad,
-  valor,
-  unidad,
-  color,
-  incluida,
-  estado,
-  activa,
-  ocupado,
-  alternar,
-  enfocar,
-  alEntrar,
-  alSalir,
-}: {
-  ciudad: Ciudad
-  valor: number | null
-  unidad: string
-  color: (v: number) => string
-  incluida: boolean
-  estado: EstadoDescarga | undefined
-  activa: boolean
-  ocupado: boolean
-  alternar: (marcar: boolean) => void
-  enfocar: () => void
-  alEntrar: () => void
-  alSalir: () => void
-}) {
-  const icono = estado && ICONOS_DESCARGA[estado]
-  return (
-    <div
-      onMouseEnter={alEntrar}
-      onMouseLeave={alSalir}
-      className={cn(
-        "flex items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] transition-colors",
-        activa ? "bg-muted ring-1 ring-foreground/20" : "hover:bg-muted/60"
-      )}
-    >
-      <Checkbox
-        aria-label={`Incluir ${ciudad.nombre} en la extracción`}
-        checked={incluida}
-        onCheckedChange={alternar}
-        disabled={ocupado}
-      />
-      <button
-        type="button"
-        onClick={enfocar}
-        title={`Ver ${ciudad.nombre} en el mapa`}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        {icono ? (
-          <icono.icono
-            aria-label={icono.texto}
-            className={cn("size-3.5 shrink-0", icono.clase)}
-          />
-        ) : (
-          <span
-            aria-hidden
-            className="size-2 shrink-0 rounded-full ring-1 ring-foreground/25"
-            style={{
-              background:
-                incluida && valor !== null ? color(valor) : "transparent",
-            }}
-          />
-        )}
-        <span
-          className={cn(
-            "flex-1 truncate font-medium",
-            !incluida && "text-muted-foreground"
-          )}
-        >
-          {ciudad.nombre}
-        </span>
-        {valor !== null && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {formatoMedida(valor, unidad)}
-          </span>
-        )}
-      </button>
     </div>
   )
 }

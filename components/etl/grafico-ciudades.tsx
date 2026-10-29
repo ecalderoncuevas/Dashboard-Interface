@@ -255,7 +255,10 @@ function Barras({
 
   return (
     <EjeY marcas={escala.marcas} pct={pct}>
-      <div aria-hidden className="grafico-animado relative flex gap-1 @xl:gap-2">
+      <div
+        aria-hidden
+        className="grafico-animado relative flex gap-1 @xl:gap-2"
+      >
         {ciudades.map((c, i) => {
           const y = pct(c.valor)
           const esActiva = activa === c.ciudad
@@ -843,7 +846,8 @@ function GraficoVacio() {
       </div>
       <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
         <span className="rounded-xl neu-sm px-3 py-2">
-          Extrae datos para ver el resumen por ciudad.
+          Pulsa «Descargar los datos» (pestaña Extracción) para ver el resumen
+          por ciudad.
         </span>
       </p>
     </div>

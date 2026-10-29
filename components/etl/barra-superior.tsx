@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
 import type { Destino } from "./aplicacion-etl"
 import { ESTADOS } from "./estado-badge"
 import { formatoEntero } from "./formato"
-import { calcularFases, ICONOS_FASE } from "./pipeline-visual"
+import { ACCIONES_FASE, calcularFases, ICONOS_FASE } from "./pipeline-visual"
 
 const FONDO_FASE: Record<EstadoFase, string> = {
   pendiente: "bg-muted text-muted-foreground",
@@ -71,7 +71,7 @@ function RielPipeline({
                   alAbrir(f.id === "extraccion" ? "extraccion" : f.pestana)
                 }
                 aria-current={activa === f.id ? "step" : undefined}
-                title={`${i + 1}. ${f.titulo} · ${textoEstado} · ${f.salida}`}
+                title={`Paso ${i + 1}: ${f.titulo} (${ACCIONES_FASE[f.id].toLowerCase()}) · ${textoEstado}${f.salida === "—" ? "" : ` · ${f.salida}`}\nPulsa para ver sus datos.`}
                 className={cn(
                   "flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
                   activa === f.id && "bg-muted ring-1 ring-foreground/15"
@@ -99,11 +99,12 @@ function RielPipeline({
                     {f.titulo}
                   </span>
                   <span className="truncate text-xs text-muted-foreground tabular-nums">
-                    {f.salida === "—" ? textoEstado : f.salida}
+                    {/* Mientras no hay resultado, se explica qué hace la fase. */}
+                    {f.salida === "—" ? ACCIONES_FASE[f.id] : f.salida}
                   </span>
                 </span>
                 <span className="sr-only lg:hidden">
-                  {f.titulo}: {textoEstado}, {f.salida}
+                  {f.titulo} ({ACCIONES_FASE[f.id]}): {textoEstado}, {f.salida}
                 </span>
               </button>
             </li>
@@ -140,7 +141,11 @@ export function BarraSuperior({
         size="icon"
         onClick={alternarPanel}
         aria-label={panelAbierto ? "Cerrar panel" : "Abrir panel"}
-        title={panelAbierto ? "Cerrar panel" : "Abrir panel"}
+        title={
+          panelAbierto
+            ? "Ocultar el panel de la derecha para ver el mapa entero"
+            : "Mostrar el panel de la derecha (descargar, gráficos y tablas)"
+        }
       >
         {panelAbierto ? (
           <PanelRightCloseIcon aria-hidden />
@@ -218,8 +223,8 @@ export function TarjetaSupabase({
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label="Comprobar conexión"
-        title="Comprobar conexión"
+        aria-label="Comprobar conexión con Supabase"
+        title="Comprobar otra vez si la base de datos (Supabase) responde"
         onClick={() => void comprobar()}
         disabled={comprobando}
         className={cn(

@@ -199,30 +199,13 @@ export function calcularFases(etl: PipelineEtl): Fase[] {
   ]
 }
 
-/** Qué tiene que hacer el estudiante a continuación, según la fase actual. */
-export function siguientePaso(fase: Fase | undefined): string {
-  if (!fase)
-    return "Pipeline completo. Consulta los datos guardados en Supabase."
-  const pasos: Record<string, Partial<Record<EstadoFase, string>>> = {
-    extraccion: {
-      pendiente: "Elige ciudades y fechas y pulsa «Extraer datos».",
-      en_curso: "Descargando los datos de Open-Meteo…",
-      error: "Alguna ciudad ha fallado: reinténtala desde la extracción.",
-    },
-    transformacion: {
-      error: "Hay arrays incoherentes: revisa los registros transformados.",
-    },
-    filtrado: {
-      en_curso: "Selecciona los registros que quieres cargar.",
-      error: "Hay filtros no válidos: corrígelos.",
-    },
-    carga: {
-      pendiente: "Revisa la vista previa y carga los datos en Supabase.",
-      en_curso: "Subiendo lotes a Supabase…",
-      error: "Hay lotes con errores o claves sin verificar: reinténtalos.",
-    },
-  }
-  return pasos[fase.id]?.[fase.estado] ?? `Revisa la fase de ${fase.titulo}.`
+/** Qué hace cada fase, en palabras de todos los días (para quien no sabe qué es ETL). */
+export const ACCIONES_FASE: Record<string, string> = {
+  extraccion: "Descargar datos",
+  transformacion: "Pasar a tabla",
+  limpieza: "Quitar errores",
+  filtrado: "Elegir filas",
+  carga: "Guardar en Supabase",
 }
 
 export const ICONOS_FASE: Record<string, LucideIcon> = {

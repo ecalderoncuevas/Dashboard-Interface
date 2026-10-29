@@ -28,15 +28,36 @@ import { ContextoResumido, useResumido } from "./detalle-panel"
 import { formatoEntero } from "./formato"
 import { GraficoCiudades } from "./grafico-ciudades"
 import { InspeccionDatos, type Pestana } from "./inspeccion-datos"
-import { calcularFases, PipelineVisual, siguientePaso } from "./pipeline-visual"
+import { GuiaPasos } from "./guia-pasos"
+import { PipelineVisual } from "./pipeline-visual"
 import { TarjetaCalidad } from "./tarjeta-calidad"
 import { TarjetasKpi } from "./tarjetas-kpi"
 
 export const VISTAS = [
-  { id: "extraccion", titulo: "Extracción", icono: CloudDownloadIcon },
-  { id: "resumen", titulo: "Resumen", icono: LayoutDashboardIcon },
-  { id: "pipeline", titulo: "Pipeline", icono: WorkflowIcon },
-  { id: "datos", titulo: "Datos", icono: Table2Icon },
+  {
+    id: "extraccion",
+    titulo: "Extracción",
+    icono: CloudDownloadIcon,
+    ayuda: "Empieza aquí: elige ciudades y fechas y descarga los datos",
+  },
+  {
+    id: "resumen",
+    titulo: "Resumen",
+    icono: LayoutDashboardIcon,
+    ayuda: "Gráficos y cifras de lo que has descargado",
+  },
+  {
+    id: "pipeline",
+    titulo: "Pipeline",
+    icono: WorkflowIcon,
+    ayuda: "Qué les pasa a los datos en cada fase, paso a paso",
+  },
+  {
+    id: "datos",
+    titulo: "Datos",
+    icono: Table2Icon,
+    ayuda: "Las tablas: revisa las filas, elige cuáles guardar y súbelas",
+  },
 ] as const
 
 export type Vista = (typeof VISTAS)[number]["id"]
@@ -124,11 +145,12 @@ export function PanelTrabajo({
           aria-label="Vistas del panel"
           className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
         >
-          {VISTAS.map(({ id, titulo, icono: Icono }) => (
+          {VISTAS.map(({ id, titulo, icono: Icono, ayuda }) => (
             <button
               key={id}
               type="button"
               role="tab"
+              title={ayuda}
               id={`vista-${id}`}
               aria-selected={vista === id}
               aria-controls={`contenido-${id}`}
@@ -186,6 +208,8 @@ export function PanelTrabajo({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         <Seccion id="extraccion" vista={vista}>
+          {/* Lo primero que se ve: qué hacer ahora y el botón para hacerlo. */}
+          <GuiaPasos etl={etl} navegar={navegar} vistaActual="extraccion" />
           <ConfiguracionExtraccion etl={etl} />
         </Seccion>
         <Seccion id="resumen" vista={vista} ampliable>
@@ -344,7 +368,6 @@ function Resumen({
 }) {
   const resumido = useResumido()
   const { config } = etl
-  const actual = calcularFases(etl).find((f) => f.estado !== "completada")
 
   return (
     <section aria-labelledby="titulo-resumen" className="flex flex-col gap-5">
@@ -378,27 +401,7 @@ function Resumen({
       <TarjetaSupabase etl={etl} className="md:hidden" />
       <TarjetasKpi etl={etl} />
 
-      {/* Sustituye a la antigua tarjeta "Estado del pipeline": el riel de arriba ya da el estado. */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl neu-hundido px-4 py-3 text-sm">
-        <p className="min-w-0 flex-1" aria-live="polite">
-          <span className="font-medium">Siguiente paso: </span>
-          <span className="text-muted-foreground">{siguientePaso(actual)}</span>
-        </p>
-        <Button
-          size="sm"
-          onClick={() =>
-            navegar(
-              !actual
-                ? "supabase"
-                : actual.id === "extraccion"
-                  ? "extraccion"
-                  : actual.pestana
-            )
-          }
-        >
-          {actual ? `Ir a ${actual.titulo}` : "Ver datos en Supabase"}
-        </Button>
-      </div>
+      <GuiaPasos etl={etl} navegar={navegar} vistaActual="resumen" />
 
       <GraficoCiudades etl={etl} />
 

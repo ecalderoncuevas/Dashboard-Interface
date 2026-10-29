@@ -80,8 +80,8 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
       <EncabezadoPaso
         numero={1}
         id="titulo-extraccion"
-        titulo="Extracción"
-        descripcion={`API histórica de Open-Meteo · horas en UTC · °C, % y mm · máximo ${MAX_DIAS_EXTRACCION} días por extracción.`}
+        titulo="Opciones de la descarga"
+        descripcion="Opcional: ya vienen elegidas."
       />
 
       <div className="grid gap-6 @4xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
@@ -98,7 +98,7 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
               <span aria-hidden className="text-sm font-medium">
                 ¿De qué ciudades?
               </span>
-              <div className="flex gap-1 text-xs">
+              <div className="flex gap-1 text-xs whitespace-nowrap">
                 <button
                   type="button"
                   disabled={ocupado}
@@ -110,7 +110,7 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
                   }
                   className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
-                  Todas
+                  Marcar todas
                 </button>
                 <button
                   type="button"
@@ -118,40 +118,61 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
                   onClick={() => setConfig((c) => ({ ...c, ciudades: [] }))}
                   className="rounded-md px-2 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
-                  Ninguna
+                  Quitar todas
                 </button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3">
               {CIUDADES.map((c) => {
                 const marcada = config.ciudades.includes(c.nombre)
+                // Resaltada aquí o desde su marcador del mapa (estado compartido).
+                const resaltada = etl.ciudadResaltada === c.nombre
                 return (
                   <button
                     key={c.nombre}
                     type="button"
                     aria-pressed={marcada}
                     disabled={ocupado}
+                    title={`${c.nombre}: su marcador se resalta en el mapa`}
                     onClick={() => alternarCiudad(c.nombre)}
+                    onMouseEnter={() => etl.setCiudadResaltada(c.nombre)}
+                    onMouseLeave={() => etl.setCiudadResaltada(null)}
+                    onFocus={() => etl.setCiudadResaltada(c.nombre)}
+                    onBlur={() => etl.setCiudadResaltada(null)}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                      "flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm transition-all duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
                       marcada
                         ? "neu-hundido font-medium"
-                        : "neu-sm text-muted-foreground hover:text-foreground"
+                        : "neu-sm text-muted-foreground hover:text-foreground",
+                      // Como la fila de la antigua lista del mapa: se ilumina y se eleva.
+                      resaltada && "-translate-y-0.5 ring-1 ring-foreground/20"
                     )}
                   >
                     <span
                       aria-hidden
-                      className="flex size-5 shrink-0 items-center justify-center rounded-full transition-colors"
-                      style={{
-                        background: marcada
-                          ? colorCiudad(c.nombre)
-                          : "transparent",
-                        boxShadow: `inset 0 0 0 1.5px ${colorCiudad(c.nombre)}`,
-                      }}
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-200",
+                        // Mismo color que las casillas de la app: musgo en claro, naranja en oscuro.
+                        marcada
+                          ? "bg-primary text-primary-foreground"
+                          : "ring-1 ring-foreground/30 ring-inset",
+                        resaltada && "scale-110"
+                      )}
                     >
-                      {marcada && <CheckIcon className="size-3 text-white" />}
+                      {marcada && (
+                        <CheckIcon className="size-3 animate-in duration-200 zoom-in-50" />
+                      )}
                     </span>
-                    {c.nombre}
+                    <span className="flex-1">{c.nombre}</span>
+                    {/* El color de la ciudad, como en el mapa y los gráficos. */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "size-2 shrink-0 rounded-full transition-opacity",
+                        !marcada && "opacity-40"
+                      )}
+                      style={{ background: colorCiudad(c.nombre) }}
+                    />
                   </button>
                 )
               })}
@@ -201,7 +222,7 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
           </fieldset>
 
           <div aria-live="polite" className="flex flex-col gap-3">
-            <span className="text-sm font-medium">Volumen previsto</span>
+            <span className="text-sm font-medium">¿Cuántos datos son?</span>
             {volumen && validacion.errores.length === 0 ? (
               <>
                 <p className="flex flex-wrap items-center gap-2 text-sm">
@@ -214,7 +235,9 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
                   <span className="text-2xl font-semibold tracking-tight tabular-nums">
                     {formatoEntero(volumen.registrosPrevistos)}
                   </span>
-                  <span className="text-muted-foreground">registros</span>
+                  <span className="text-muted-foreground">
+                    filas (una por ciudad y hora)
+                  </span>
                 </p>
                 <div className="flex flex-col gap-1.5">
                   <div className="h-3 overflow-hidden rounded-full neu-hundido p-0.5">
@@ -226,8 +249,10 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
                     />
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {volumen.dias} de {MAX_DIAS_EXTRACCION} días permitidos ·{" "}
-                    {volumen.peticiones} peticiones (una por ciudad)
+                    {volumen.dias} de {MAX_DIAS_EXTRACCION} días como máximo ·
+                    se hace {volumen.peticiones}{" "}
+                    {volumen.peticiones === 1 ? "petición" : "peticiones"} a
+                    Open-Meteo (una por ciudad)
                   </span>
                 </div>
               </>
@@ -268,7 +293,7 @@ export function ConfiguracionExtraccion({ etl }: { etl: PipelineEtl }) {
             ) : (
               <DownloadCloudIcon aria-hidden />
             )}
-            Extraer datos
+            Descargar los datos con estas opciones
           </Button>
         </form>
 

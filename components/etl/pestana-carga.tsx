@@ -38,6 +38,22 @@ const COLUMNAS: Columna<FilaVistaPrevia>[] = [
   })),
 ]
 
+/** Por qué no se puede subir todavía (null si se puede). Lo usa también la guía de pasos. */
+export function motivoBloqueoCarga(etl: PipelineEtl): string | null {
+  const { estadoSupabase } = etl
+  return !estadoSupabase
+    ? "Comprobando la conexión con Supabase…"
+    : !estadoSupabase.configurado
+      ? `Supabase no está configurado: faltan ${estadoSupabase.faltan.join(", ")}.`
+      : !estadoSupabase.tablaAccesible
+        ? estadoSupabase.mensaje
+        : etl.filtrosInterpretados.errores.length > 0
+          ? "Corrige los filtros antes de subir."
+          : etl.conjuntoCarga.registros.length === 0
+            ? "No hay filas seleccionadas que cumplan los filtros."
+            : null
+}
+
 export function PestanaCarga({ etl }: { etl: PipelineEtl }) {
   const { conjuntoCarga, carga, estadoSupabase, orden } = etl
   const filas = React.useMemo(
@@ -53,24 +69,15 @@ export function PestanaCarga({ etl }: { etl: PipelineEtl }) {
   if (!etl.procesado && !carga) {
     return (
       <SinDatos>
-        Extrae datos y selecciona registros para preparar la carga.
+        Primero descarga los datos (pestaña Extracción); después podrás
+        guardarlos aquí.
       </SinDatos>
     )
   }
 
   const n = conjuntoCarga.registros.length
   const lotesPrevistos = Math.ceil(n / TAMANO_LOTE)
-  const motivoBloqueo = !estadoSupabase
-    ? "Comprobando la conexión con Supabase…"
-    : !estadoSupabase.configurado
-      ? `Supabase no está configurado: faltan ${estadoSupabase.faltan.join(", ")}.`
-      : !estadoSupabase.tablaAccesible
-        ? estadoSupabase.mensaje
-        : etl.filtrosInterpretados.errores.length > 0
-          ? "Corrige los filtros antes de subir."
-          : n === 0
-            ? "No hay filas seleccionadas que cumplan los filtros."
-            : null
+  const motivoBloqueo = motivoBloqueoCarga(etl)
 
   return (
     <div className="flex flex-col gap-4">
@@ -99,7 +106,7 @@ export function PestanaCarga({ etl }: { etl: PipelineEtl }) {
           ) : (
             <UploadCloudIcon aria-hidden />
           )}
-          Subir {formatoEntero(n)} registros a Supabase
+          Guardar {formatoEntero(n)} filas en Supabase
         </Button>
         <span className="text-sm text-muted-foreground">
           {n > 0 &&

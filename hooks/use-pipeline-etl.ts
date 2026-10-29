@@ -94,6 +94,10 @@ export function usePipelineEtl() {
   const [carga, setCarga] = React.useState<EstadoCargaSupabase | null>(null)
   const [estadoSupabase, setEstadoSupabase] =
     React.useState<EstadoSupabase | null>(null)
+  // Ciudad bajo el ratón en el panel o en el mapa: ambos la resaltan a la vez.
+  const [ciudadResaltada, setCiudadResaltada] = React.useState<string | null>(
+    null
+  )
 
   // Las referencias evitan envíos simultáneos aunque React aún no haya re-renderizado.
   const extrayendoRef = React.useRef(false)
@@ -427,6 +431,8 @@ export function usePipelineEtl() {
     verificar,
     estadoSupabase,
     refrescarEstadoSupabase,
+    ciudadResaltada,
+    setCiudadResaltada,
   }
 }
 
